@@ -2774,7 +2774,7 @@ function buildProcessMapExportSvg() {
     // Reset transform for export to ensure it saves at 100% original size
     const exportWrap = clonedSvg.querySelector("g.viewport-wrap");
     if (exportWrap) {
-        exportWrap.style.transform = "none";
+        exportWrap.removeAttribute("transform");
     }
     
     const viewBox = clonedSvg.getAttribute("viewBox") || "0 0 1200 600";
@@ -4644,9 +4644,6 @@ function attachProcessMapInteractions(viewportElement) {
     let currentPanX = 0;
     let currentPanY = 0;
 
-    // We need a wrapper inside the SVG to apply transforms, or apply to root
-    const rootMatrix = svgElement.createSVGMatrix();
-
     svgElement.style.cursor = "grab";
 
     svgElement.addEventListener("mousedown", (e) => {
@@ -4749,10 +4746,13 @@ function attachProcessMapInteractions(viewportElement) {
     function applyTransform() {
         const gWrap = svgElement.querySelector(".viewport-wrap");
         if (!gWrap) return;
-        
-        const transformString = `translate(${currentPanX}px, ${currentPanY}px) scale(${currentScale})`;
-        gWrap.style.transform = transformString;
-        gWrap.style.transformOrigin = "0 0";
+
+        // Use the SVG transform attribute instead of CSS transform.
+        // CSS transforms on <g> can drop path/marker rendering at certain zoom levels.
+        gWrap.setAttribute(
+            "transform",
+            `translate(${currentPanX} ${currentPanY}) scale(${currentScale})`
+        );
         
         if (zoomIndicator) {
             zoomIndicator.textContent = Math.round(currentScale * 100) + "%";
@@ -5092,10 +5092,5 @@ async function renderDetailPage() {
 }
 
 void renderDetailPage();
-
-
-
-
-
 
 
