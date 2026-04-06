@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>パターン詳細 | ProcessLens</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v={{ static_version }}">
+</head>
+<body class="app-shell app-shell--detail" data-pattern-index="{{ pattern_index }}">
+    <header class="top-header">
+        <a href="/" class="top-logo">
+            <div class="logo-mark">PL</div>
+            <div class="logo-name">Process<span>Lens</span></div>
+        </a>
+        <div class="header-breadcrumb">
+            <span>Home</span>
+            <span class="sep">/</span>
+            <span>Pattern</span>
+            <span class="sep">/</span>
+            <span class="current">パターン詳細</span>
+        </div>
+        <div class="header-right">
+            <a href="/analysis/pattern" class="hbtn">パターン分析</a>
+            <a href="/" class="hbtn primary">ダッシュボード</a>
+        </div>
+    </header>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-label">Menu</div>
+                <a class="nav-item" href="/">
+                    <div class="nav-dot blue">DB</div>
+                    ダッシュボード
+                </a>
+                <a class="nav-item active" href="/analysis/pattern">
+                    <div class="nav-dot violet">PT</div>
+                    パターン詳細
+                </a>
+                <a class="nav-item" href="/">
+                    <div class="nav-dot gray">BK</div>
+                    ダッシュボードへ戻る
+                </a>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-label">Analysis</div>
+                <a class="nav-item" href="/analysis/frequency">
+                    <div class="nav-dot blue">FR</div>
+                    頻度分析
+                </a>
+                <a class="nav-item" href="/analysis/transition">
+                    <div class="nav-dot green">TR</div>
+                    前後処理分析
+                </a>
+                <a class="nav-item active" href="/analysis/pattern">
+                    <div class="nav-dot violet">PT</div>
+                    処理順パターン分析
+                </a>
+            </div>
+        </aside>
+
+        <main class="app-main">
+            <div class="page-shell page-shell--detail">
+                <section class="detail-hero">
+                    <div>
+                        <p class="eyebrow">Pattern Detail</p>
+                        <h1 id="pattern-page-title">パターン詳細</h1>
+                        <p id="pattern-page-copy" class="hero-copy">
+                            選択した処理順パターンに属するケースだけを表示し、どの工程で所要時間が長いかを確認できます。
+                        </p>
+                    </div>
+                    <div class="detail-hero-actions">
+                        <a href="/analysis/pattern" class="ghost-link">パターン分析へ戻る</a>
+                        <a href="/" class="ghost-link">ダッシュボード</a>
+                    </div>
+                </section>
+
+                <section id="pattern-status-panel" class="status-panel hidden"></section>
+                <section id="pattern-summary-panel" class="summary-panel hidden"></section>
+                <section id="pattern-bottleneck-panel" class="result-panel hidden"></section>
+                <section id="pattern-step-panel" class="result-panel hidden"></section>
+                <section id="pattern-drilldown-panel" class="result-panel hidden"></section>
+                <section id="pattern-case-panel" class="result-panel hidden"></section>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', path='/process_mining_shared.js') }}?v={{ static_version }}"></script>
+    <script src="{{ url_for('static', path='/pattern_detail.js') }}?v={{ static_version }}"></script>
+</body>
+</html>

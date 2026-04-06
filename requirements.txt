@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+jinja2==3.1.4
+python-multipart
+pandas
+openpyxl
+httpx
