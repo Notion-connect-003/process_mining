@@ -3081,8 +3081,16 @@ function renderProcessFlowMapFromData(flowData, options = {}) {
             : isBack
                 ? "#6f83aa"
                 : "#2d5ec4";
+        // SVG glow filters can collapse on perfectly vertical/horizontal paths
+        // because their bbox width/height becomes zero in Chromium.
+        const edgeFilter = (
+            Math.abs(startX - endX) < 0.5
+            || Math.abs(startY - endY) < 0.5
+        )
+            ? "none"
+            : "var(--edge-heat-filter, none)";
         return `
-            <path d="${pathD}" class="${isBack ? "process-map-edge process-map-edge--return" : "process-map-edge"}" marker-end="url(#${isBack ? "process-map-arrow-return" : "process-map-arrow"})" data-source="${escapeHtml(edge.source)}" data-target="${escapeHtml(edge.target)}" data-transition-key="${escapeHtml(transitionKey)}" style="stroke-width: ${strokeWidth}; opacity: ${opacity}; fill: none; stroke: var(--edge-heat-stroke, ${strokeColor}); filter: var(--edge-heat-filter, none);"></path>
+            <path d="${pathD}" class="${isBack ? "process-map-edge process-map-edge--return" : "process-map-edge"}" marker-end="url(#${isBack ? "process-map-arrow-return" : "process-map-arrow"})" data-source="${escapeHtml(edge.source)}" data-target="${escapeHtml(edge.target)}" data-transition-key="${escapeHtml(transitionKey)}" style="stroke-width: ${strokeWidth}; opacity: ${opacity}; fill: none; stroke: var(--edge-heat-stroke, ${strokeColor}); filter: ${edgeFilter};"></path>
             ${showLabel ? `<text x="${lblX}" y="${lblY}" class="${isBack ? "process-map-edge-label process-map-edge-label--return" : "process-map-edge-label"}" data-source="${escapeHtml(edge.source)}" data-target="${escapeHtml(edge.target)}" data-transition-key="${escapeHtml(transitionKey)}" data-label-count="${escapeHtml(getProcessMapEdgeLabelText(edge, "count"))}" data-label-duration="${escapeHtml(getProcessMapEdgeLabelText(edge, "duration"))}" data-label-mode="${escapeHtml(labelMode)}">${escapeHtml(getProcessMapEdgeLabelText(edge, labelMode))}</text>` : ""}
         `;
     }).join("");
@@ -5092,5 +5100,4 @@ async function renderDetailPage() {
 }
 
 void renderDetailPage();
-
 
