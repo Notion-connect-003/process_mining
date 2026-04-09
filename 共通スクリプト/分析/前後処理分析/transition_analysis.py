@@ -7,12 +7,12 @@ ANALYSIS_CONFIG = {
         "to_activity": "後処理アクティビティ名",
         "transition_count": "遷移件数",
         "case_count": "ケース数",
-        "total_duration_min": "合計時間(分)",
-        "avg_duration_min": "平均時間(分)",
-        "median_duration_min": "中央値時間(分)",
+        "total_duration_min": "合計所要時間(分)",
+        "avg_duration_min": "平均所要時間(分)",
+        "median_duration_min": "中央値所要時間(分)",
         "std_duration_min": "標準偏差(分)",
-        "min_duration_min": "最小時間(分)",
-        "max_duration_min": "最大時間(分)",
+        "min_duration_min": "最小所要時間(分)",
+        "max_duration_min": "最大所要時間(分)",
         "p75_duration_min": "75%点(分)",
         "p90_duration_min": "90%点(分)",
         "p95_duration_min": "95%点(分)",
@@ -22,7 +22,7 @@ ANALYSIS_CONFIG = {
 
 
 
-def create_transition_analysis(df):
+def create_transition_analysis(df, group_columns=None):
     work = df.copy()
 
     # ケース内の次イベントを横持ちにして遷移を集計します。
@@ -34,8 +34,15 @@ def create_transition_analysis(df):
         (work["next_start_time"] - work["next_time"]).dt.total_seconds() / 60
     )
 
+    # group_columns が指定された場合はグルーピングモードとして集計します。
+    valid_group_cols = [col for col in (group_columns or []) if col in work.columns]
+    if valid_group_cols:
+        groupby_keys = valid_group_cols + ["activity", "next_activity"]
+    else:
+        groupby_keys = ["activity", "next_activity"]
+
     result = (
-        work.groupby(["activity", "next_activity"])
+        work.groupby(groupby_keys)
         .agg(
             transition_count=("case_id", "count"),
             case_count=("case_id", "nunique"),
@@ -87,32 +94,34 @@ def create_transition_analysis(df):
         .where(result["std_duration_min"].notna(), other="-")
     )
 
-    result = result.sort_values(
-        ["transition_count", "from_activity", "to_activity"],
-        ascending=[False, True, True],
-    ).reset_index(drop=True)
+    sort_keys = valid_group_cols + ["transition_count", "from_activity", "to_activity"]
+    sort_ascending = [True] * len(valid_group_cols) + [False, True, True]
+    result = result.sort_values(sort_keys, ascending=sort_ascending).reset_index(drop=True)
 
-    ordered_columns = [
-        "from_activity",
-        "to_activity",
-        "transition_count",
-        "case_count",
-        "total_duration_min",
-        "avg_duration_min",
-        "median_duration_min",
-        "std_duration_min",
-        "min_duration_min",
-        "max_duration_min",
-        "p75_duration_min",
-        "p90_duration_min",
-        "p95_duration_min",
-        "from_total_duration_min",
-        "from_avg_duration_min",
-        "to_total_duration_min",
-        "to_avg_duration_min",
-        "total_waiting_time_min",
-        "avg_waiting_time_min",
-        "transition_ratio_pct",
-    ]
+    ordered_columns = (
+        valid_group_cols
+        + [
+            "from_activity",
+            "to_activity",
+            "transition_count",
+            "case_count",
+            "total_duration_min",
+            "avg_duration_min",
+            "median_duration_min",
+            "std_duration_min",
+            "min_duration_min",
+            "max_duration_min",
+            "p75_duration_min",
+            "p90_duration_min",
+            "p95_duration_min",
+            "from_total_duration_min",
+            "from_avg_duration_min",
+            "to_total_duration_min",
+            "to_avg_duration_min",
+            "total_waiting_time_min",
+            "avg_waiting_time_min",
+            "transition_ratio_pct",
+        ]
+    )
 
-    return result[ordered_columns]
+    return result[[col for col in ordered_columns if col in result.columns]]

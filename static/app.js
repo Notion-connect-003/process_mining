@@ -1,6 +1,7 @@
 const PREVIEW_ROW_COUNT = 10;
 const STORAGE_KEY = "processMiningLastResult";
 const TOP_PAGE_STATE_KEY = "processMiningTopPageState";
+const DASHBOARD_SUPPLEMENT_KEY = "processMiningDashboardSupplement";
 const FLOW_SELECTION_STORAGE_KEY = "processMiningFlowSelection";
 const TRANSITION_DRILLDOWN_STORAGE_KEY = "processMiningTransitionDrilldown";
 const FILTER_SLOT_KEYS = ["filter_value_1", "filter_value_2", "filter_value_3"];
@@ -18,10 +19,22 @@ const resultPanels = document.getElementById("result-panels");
 const csvFileInput = document.getElementById("csv-file-input");
 const columnSourceNote = document.getElementById("column-source-note");
 const diagnosticsPanel = document.getElementById("log-diagnostics-panel");
+const diagnosticsSection = document.getElementById("log-diagnostics-section");
 const diagnosticsButton = document.getElementById("run-diagnostics-button");
+const diagnosticsExcelButton = document.getElementById("download-diagnostics-excel-button");
+const diagnosticsSampleLimitInput = document.getElementById("diagnostics-sample-limit-input");
 const resetFilterButton = document.getElementById("reset-filter-button");
 const filterSelectionNote = document.getElementById("filter-selection-note");
 const initialProfilePayloadElement = document.getElementById("initial-profile-payload");
+const insightPanel = document.getElementById("insight-panel");
+const setupSection = document.getElementById("setup-section");
+const setupToggleButton = document.getElementById("setup-toggle-button");
+const setupSourceTag = document.getElementById("setup-source-tag");
+const setupMappingTag = document.getElementById("setup-mapping-tag");
+const setupVolumeTag = document.getElementById("setup-volume-tag");
+const setupSummaryOpenButton = document.getElementById("setup-summary-open-button");
+const topOpenCsvButton = document.getElementById("top-open-csv-button");
+const filterChipBar = document.getElementById("filter-chip-bar");
 
 const caseIdColumnSelect = document.getElementById("case-id-column-select");
 const activityColumnSelect = document.getElementById("activity-column-select");
@@ -54,18 +67,22 @@ const filterColumnRefs = [
 ];
 
 const defaultSourceFileName = String(columnSourceNote?.dataset?.sourceFileName || "").trim();
+const DEFAULT_LOG_DIAGNOSTIC_SAMPLE_ROW_LIMIT = 3000;
 
 let isLoadingProfile = false;
 let isAnalyzing = false;
 let isRunningDiagnostics = false;
+let isDownloadingDiagnosticsExcel = false;
 let profileRequestVersion = 0;
 let diagnosticRequestVersion = 0;
+let dashboardSupplementRequestVersion = 0;
 let restoredTopPageState = loadTopPageState();
 let requiresFileReselection = false;
 let currentProfilePayload = mergeProfilePayload(
     loadInitialProfilePayload(),
     restoredTopPageState?.profilePayload,
 );
+let currentDashboardSupplement = loadDashboardSupplement();
 
 function setStatus(message, type = "info") {
     statusPanel.textContent = message;
@@ -84,6 +101,295 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+}
+
+function formatNumber(value) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        return String(value ?? "-");
+    }
+    return numericValue.toLocaleString("ja-JP");
+}
+
+function formatPercent(value, digits = 1) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        return "-";
+    }
+    return `${numericValue.toFixed(digits)}%`;
+}
+
+function isNumericCellValue(value) {
+    if (typeof value === "number") {
+        return Number.isFinite(value);
+    }
+
+    if (typeof value !== "string") {
+        return false;
+    }
+
+    return /^-?\d+(?:\.\d+)?%?$/.test(value.replaceAll(",", "").trim());
+}
+
+function loadDashboardSupplement() {
+    const storedValue = sessionStorage.getItem(DASHBOARD_SUPPLEMENT_KEY);
+    if (!storedValue) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(storedValue);
+    } catch {
+        sessionStorage.removeItem(DASHBOARD_SUPPLEMENT_KEY);
+        return null;
+    }
+}
+
+function saveDashboardSupplement(payload) {
+    currentDashboardSupplement = payload || null;
+    try {
+        if (!payload) {
+            sessionStorage.removeItem(DASHBOARD_SUPPLEMENT_KEY);
+            return;
+        }
+        sessionStorage.setItem(DASHBOARD_SUPPLEMENT_KEY, JSON.stringify(payload));
+    } catch {
+        // Ignore storage failures and keep the current render only.
+    }
+}
+
+function clearDashboardSupplement() {
+    currentDashboardSupplement = null;
+    try {
+        sessionStorage.removeItem(DASHBOARD_SUPPLEMENT_KEY);
+    } catch {
+        // Ignore storage failures and keep the current render only.
+    }
+}
+
+function setSetupSectionOpen(isOpen) {
+    if (!setupSection || !setupToggleButton) {
+        return;
+    }
+
+    setupSection.classList.toggle("is-open", Boolean(isOpen));
+    setupToggleButton.setAttribute("aria-expanded", String(Boolean(isOpen)));
+}
+
+function getResolvedMappingLabel(selectElement, fallbackValue = "") {
+    const directValue = String(selectElement?.value || "").trim();
+    if (directValue) {
+        return directValue;
+    }
+    return String(fallbackValue || "").trim();
+}
+
+function getCurrentSelectedAnalysisKeys() {
+    if (!form) {
+        return [];
+    }
+    return Array.from(form.querySelectorAll('input[name="analysis_keys"]:checked'))
+        .map((input) => String(input.value || "").trim())
+        .filter(Boolean);
+}
+
+function syncAnalysisSelectionChips() {
+    if (!form) {
+        return;
+    }
+
+    form.querySelectorAll(".target-check").forEach((labelElement) => {
+        const checkbox = labelElement.querySelector('input[name="analysis_keys"]');
+        labelElement.classList.toggle("checked", Boolean(checkbox?.checked));
+    });
+}
+
+function getDashboardAnalysisKey(analyses = {}) {
+    if (analyses?.pattern) {
+        return "pattern";
+    }
+    if (analyses?.transition) {
+        return "transition";
+    }
+    if (analyses?.frequency) {
+        return "frequency";
+    }
+    return Object.keys(analyses || {})[0] || "";
+}
+
+function updateSetupSummary(resultData = loadLatestResult(), supplement = currentDashboardSupplement) {
+    if (setupSourceTag) {
+        const sourceFileName = String(
+            currentProfilePayload?.source_file_name
+            || resultData?.source_file_name
+            || defaultSourceFileName
+            || "",
+        ).trim();
+        setupSourceTag.textContent = sourceFileName
+            ? `ファイル: ${sourceFileName}`
+            : "ファイル: 未選択";
+    }
+
+    if (setupMappingTag) {
+        const defaultSelection = currentProfilePayload?.default_selection || {};
+        const mappingLabels = [
+            getResolvedMappingLabel(caseIdColumnSelect, defaultSelection.case_id_column),
+            getResolvedMappingLabel(activityColumnSelect, defaultSelection.activity_column),
+            getResolvedMappingLabel(timestampColumnSelect, defaultSelection.timestamp_column),
+        ].filter(Boolean);
+        setupMappingTag.textContent = mappingLabels.length === 3
+            ? `列: ${mappingLabels.join(" / ")}`
+            : "列: ケースID / アクティビティ / タイムスタンプ";
+    }
+
+    if (!setupVolumeTag) {
+        return;
+    }
+
+    const diagnostics = currentProfilePayload?.diagnostics;
+    const dashboard = supplement?.dashboard;
+    if (dashboard?.has_data) {
+        setupVolumeTag.textContent = `件数: ${formatNumber(dashboard.total_cases)} ケース / ${formatNumber(dashboard.total_records)} イベント / ${formatNumber(dashboard.activity_type_count)} アクティビティ`;
+        return;
+    }
+
+    if (diagnostics) {
+        setupVolumeTag.textContent = `件数: ${formatNumber(diagnostics.case_count)} ケース / ${formatNumber(diagnostics.record_count)} レコード / ${formatNumber(diagnostics.activity_type_count)} アクティビティ`;
+        return;
+    }
+
+    if (resultData?.case_count || resultData?.event_count) {
+        setupVolumeTag.textContent = `件数: ${formatNumber(resultData.case_count)} ケース / ${formatNumber(resultData.event_count)} イベント`;
+        return;
+    }
+
+    setupVolumeTag.textContent = "件数: ログ診断未実行";
+}
+
+function buildPreviewMessage(analysis, previewRows) {
+    const totalRowCount = Number(analysis?.row_count ?? analysis?.rows?.length ?? 0);
+    return totalRowCount > previewRows.length
+        ? `Top ${previewRows.length} を表示 / 全 ${formatNumber(totalRowCount)} 件`
+        : `全 ${formatNumber(totalRowCount)} 件を表示`;
+}
+
+function getDashboardPreviewHeaders(analysisKey) {
+    switch (analysisKey) {
+    case "frequency":
+        return ["アクティビティ", "イベント件数", "ケース数", "平均処理時間(分)"];
+    case "transition":
+        return ["遷移名", "ケース数", "平均所要時間(分)", "中央値所要時間(分)", "割合(%)"];
+    case "pattern":
+        return ["パターン", "ケース数", "比率(%)", "平均ケース処理時間(分)"];
+    default:
+        return [];
+    }
+}
+
+function buildDashboardPreviewRows(analysisKey, rows = []) {
+    const previewHeaders = getDashboardPreviewHeaders(analysisKey);
+
+    return rows.slice(0, 5).map((row, rowIndex) => {
+        if (analysisKey === "transition") {
+            const transitionName = row["遷移名"]
+                || [row["前処理アクティビティ名"], row["後処理アクティビティ名"]]
+                    .filter(Boolean)
+                    .join(" → ");
+            return {
+                "遷移名": transitionName,
+                "ケース数": row["ケース数"] ?? row["遷移件数"] ?? "-",
+                "平均所要時間(分)": row["平均所要時間(分)"] ?? row["平均時間(分)"] ?? "-",
+                "中央値所要時間(分)": row["中央値所要時間(分)"] ?? row["中央値時間(分)"] ?? "-",
+                "割合(%)": row["割合(%)"] ?? row["遷移比率(%)"] ?? "-",
+                __rowIndex: rowIndex,
+            };
+        }
+
+        if (analysisKey === "pattern") {
+            const patternText = String(
+                row["パターン"]
+                || row["処理順パターン"]
+                || row["パターン / バリアント"]
+                || ""
+            ).trim();
+            const patternSteps = patternText
+                .split(/\s*(?:→|->|⇒)\s*/u)
+                .map((step) => step.trim())
+                .filter(Boolean);
+            const compactPattern = patternSteps.length > 3
+                ? `${patternSteps.slice(0, 3).join(" → ")} → ...（全${patternSteps.length}ステップ）`
+                : patternText;
+            return {
+                "パターン": compactPattern || "-",
+                "ケース数": row["ケース数"] ?? "-",
+                "比率(%)": row["比率(%)"] ?? row["ケース比率(%)"] ?? "-",
+                "平均ケース処理時間(分)": row["平均ケース処理時間(分)"] ?? row["平均処理時間(分)"] ?? "-",
+                __rowIndex: rowIndex,
+            };
+        }
+
+        const normalizedRow = {};
+        previewHeaders.forEach((header) => {
+            normalizedRow[header] = row[header] ?? "-";
+        });
+        normalizedRow.__rowIndex = rowIndex;
+        return normalizedRow;
+    });
+}
+
+function renderInsightPanel(supplement, state = "ready") {
+    if (!insightPanel) {
+        return;
+    }
+
+    if (state === "hidden") {
+        insightPanel.className = "dashboard-insight hidden";
+        insightPanel.innerHTML = "";
+        return;
+    }
+
+    const insightTexts = Array.isArray(supplement?.insights?.items)
+        ? supplement.insights.items.map((item) => String(item?.text || "").trim()).filter(Boolean).slice(0, 5)
+        : [];
+    let chipLabel = "AI 判定";
+    let bodyText = "";
+
+    if (state === "loading") {
+        chipLabel = "読込中";
+        bodyText = "分析結果をもとに、ダッシュボード向けの要点を整理しています。";
+    } else if (state === "error") {
+        chipLabel = "取得失敗";
+        bodyText = "ダッシュボード用の要約取得に失敗しました。分析結果の表プレビューはそのまま確認できます。";
+    } else if (!insightTexts.length) {
+        chipLabel = "準備中";
+        bodyText = "分析を実行すると、この画面向けのインサイトを表示します。";
+    }
+
+    insightPanel.className = "dashboard-insight";
+    insightPanel.dataset.state = state;
+    insightPanel.innerHTML = `
+        <div class="dashboard-insight-head">
+            <div class="dashboard-insight-title">AI インサイト</div>
+            <span class="dashboard-insight-chip">${escapeHtml(chipLabel)}</span>
+        </div>
+        ${
+            state === "ready" && insightTexts.length
+                ? `
+                    <ul class="dashboard-insight-list">
+                        ${insightTexts.map((text, index) => {
+                            const icons = ["📊", "📈", "⚠️", "🔍", "✅"];
+                            return `
+                                <li class="dashboard-insight-item">
+                                    <span class="dashboard-insight-item-icon">${icons[index] || "•"}</span>
+                                    <span>${escapeHtml(text)}</span>
+                                </li>
+                            `;
+                        }).join("")}
+                    </ul>
+                `
+                : `<p class="dashboard-insight-text">${escapeHtml(bodyText)}</p>`
+        }
+    `;
 }
 
 function buildDefaultProfilePayload() {
@@ -132,9 +438,21 @@ function mergeProfilePayload(basePayload, nextPayload) {
 }
 
 function syncSubmitState() {
-    submitButton.disabled = isLoadingProfile || isAnalyzing || isRunningDiagnostics;
+    const isBusy = (
+        isLoadingProfile
+        || isAnalyzing
+        || isRunningDiagnostics
+        || isDownloadingDiagnosticsExcel
+    );
+    submitButton.disabled = isBusy;
     if (diagnosticsButton) {
-        diagnosticsButton.disabled = isLoadingProfile || isAnalyzing || isRunningDiagnostics;
+        diagnosticsButton.disabled = isBusy;
+    }
+    if (diagnosticsExcelButton) {
+        diagnosticsExcelButton.disabled = isBusy;
+    }
+    if (topOpenCsvButton) {
+        topOpenCsvButton.disabled = isBusy;
     }
 }
 
@@ -158,6 +476,7 @@ function buildTable(rows, options = {}) {
     const bodyHtml = rows.map((row) => {
         const cells = headers.map((header) => {
             const cellValue = escapeHtml(row[header]);
+            const numericClass = isNumericCellValue(row[header]) ? " num" : "";
             const isWideHeader = (
                 header.includes("\u30d1\u30bf\u30fc\u30f3")
                 || header.includes("\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3")
@@ -171,7 +490,7 @@ function buildTable(rows, options = {}) {
 
             if (isPatternLink) {
                 return `
-                    <td class="table-cell--wide">
+                    <td class="table-cell--wide${numericClass}">
                         <div class="cell-scroll-wrapper">
                             <a href="${buildPatternDetailHref(runId, row.__rowIndex)}" class="table-link">${cellValue}</a>
                         </div>
@@ -181,13 +500,13 @@ function buildTable(rows, options = {}) {
 
             if (isWideHeader) {
                 return `
-                    <td class="table-cell--wide">
+                    <td class="table-cell--wide${numericClass}">
                         <div class="cell-scroll-wrapper">${cellValue}</div>
                     </td>
                 `;
             }
 
-            return `<td>${cellValue}</td>`;
+            return `<td class="${numericClass.trim()}">${cellValue}</td>`;
         }).join("");
 
         return `<tr>${cells}</tr>`;
@@ -195,7 +514,7 @@ function buildTable(rows, options = {}) {
 
     return `
         <div class="table-wrap">
-            <table>
+            <table class="data-table">
                 <thead><tr>${headHtml}</tr></thead>
                 <tbody>${bodyHtml}</tbody>
             </table>
@@ -203,21 +522,252 @@ function buildTable(rows, options = {}) {
     `;
 }
 
+function buildGroupedTable(rows, groupColumns = [], options = {}) {
+    if (!rows.length) {
+        return '<p class="empty-state">表示できるデータがありません。</p>';
+    }
+
+    const headers = Object.keys(rows[0]).filter((h) => !h.startsWith("__"));
+    const validGroupCols = groupColumns.filter((col) => headers.includes(col));
+
+    if (!validGroupCols.length) {
+        return buildTable(rows, options);
+    }
+
+    const { analysisKey = "", runId = "" } = options;
+    const nonGroupHeaders = headers.filter((h) => !validGroupCols.includes(h));
+    const allHeaders = [...validGroupCols, ...nonGroupHeaders];
+    const headHtml = allHeaders.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
+
+    // rowspan計算: 各行・各グループ列について「同じ上位グループ値が続く連続数」を求める
+    function calcRowspan(rowIndex, colIndex) {
+        const row = rows[rowIndex];
+        let span = 1;
+        while (rowIndex + span < rows.length) {
+            const same = validGroupCols
+                .slice(0, colIndex + 1)
+                .every((col) => String(rows[rowIndex + span][col] ?? "") === String(row[col] ?? ""));
+            if (!same) break;
+            span++;
+        }
+        return span;
+    }
+
+    function isMergedCell(rowIndex, colIndex) {
+        if (rowIndex === 0) return false;
+        return validGroupCols
+            .slice(0, colIndex + 1)
+            .every((col) => String(rows[rowIndex - 1][col] ?? "") === String(rows[rowIndex][col] ?? ""));
+    }
+
+    const bodyHtml = rows.map((row, rowIndex) => {
+        const groupCellsHtml = validGroupCols.map((groupCol, colIndex) => {
+            if (isMergedCell(rowIndex, colIndex)) return "";
+            const span = calcRowspan(rowIndex, colIndex);
+            const cellStr = escapeHtml(String(row[groupCol] ?? ""));
+            const rowspanAttr = span > 1 ? ` rowspan="${span}"` : "";
+            return `<td class="group-cell"${rowspanAttr}>${cellStr}</td>`;
+        }).join("");
+
+        const dataCellsHtml = nonGroupHeaders.map((header) => {
+            const cellValue = row[header];
+            const cellStr = escapeHtml(String(cellValue ?? ""));
+            const numericClass = isNumericCellValue(cellValue) ? " num" : "";
+            const isWideHeader = header.includes("パターン") || header.includes("アクティビティ");
+            const isPatternLink = (
+                analysisKey === "pattern"
+                && header.includes("パターン")
+                && runId
+                && Number.isInteger(row.__rowIndex)
+            );
+
+            if (isPatternLink) {
+                return `<td class="table-cell--wide${numericClass}"><div class="cell-scroll-wrapper"><a href="${buildPatternDetailHref(runId, row.__rowIndex)}" class="table-link">${cellStr}</a></div></td>`;
+            }
+            if (isWideHeader) {
+                return `<td class="table-cell--wide${numericClass}"><div class="cell-scroll-wrapper">${cellStr}</div></td>`;
+            }
+            return `<td class="${numericClass.trim()}">${cellStr}</td>`;
+        }).join("");
+
+        return `<tr>${groupCellsHtml}${dataCellsHtml}</tr>`;
+    }).join("");
+
+    return `
+        <div class="table-wrap">
+            <table class="data-table data-table--grouped">
+                <thead><tr>${headHtml}</tr></thead>
+                <tbody>${bodyHtml}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+function splitPatternSteps(patternText) {
+    return String(patternText || "")
+        .split(/\s*(?:→|->|⇒)\s*/u)
+        .map((step) => step.trim())
+        .filter(Boolean);
+}
+
+function hasRepeatedPatternStep(patternText) {
+    const steps = splitPatternSteps(patternText);
+    return new Set(steps).size < steps.length;
+}
+
+function countRepeatedPatternSteps(patternText) {
+    const steps = splitPatternSteps(patternText);
+    return Math.max(0, steps.length - new Set(steps).size);
+}
+
+function calculateRepeatRatePct(patternText) {
+    const steps = splitPatternSteps(patternText);
+    if (!steps.length) {
+        return 0;
+    }
+    return Math.round((countRepeatedPatternSteps(patternText) / steps.length) * 10000) / 100;
+}
+
+function buildPatternReviewFlag(repeatRatePct) {
+    return Number(repeatRatePct || 0) >= 20 ? "要確認" : "";
+}
+
+function buildPatternSimpleComment(repeatCount, repeatRatePct) {
+    if (Number(repeatRatePct || 0) >= 20) {
+        return `繰り返し率が ${Number(repeatRatePct || 0).toFixed(2)}% と高く、再確認や差戻しが発生している可能性があります。`;
+    }
+    if (Number(repeatCount || 0) > 0) {
+        return `同一アクティビティの繰り返しが ${Number(repeatCount || 0)} 回あります。`;
+    }
+    return "繰り返しは確認されません。";
+}
+
+function normalizePatternAnalysisRow(row) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+        return row;
+    }
+
+    const patternText = (
+        row["処理順パターン"]
+        || row["パターン"]
+        || row.pattern
+        || row["代表ルート"]
+        || ""
+    );
+    const repeatFlag = hasRepeatedPatternStep(patternText) ? "○" : "";
+    const repeatCount = countRepeatedPatternSteps(patternText);
+    const repeatRatePct = calculateRepeatRatePct(patternText);
+    const reviewFlag = buildPatternReviewFlag(repeatRatePct);
+    const simpleComment = buildPatternSimpleComment(repeatCount, repeatRatePct);
+    const normalizedEntries = [];
+    let hasRepeatColumn = false;
+    let hasRepeatCountColumn = false;
+    let hasRepeatRateColumn = false;
+    let hasReviewFlagColumn = false;
+    let hasCommentColumn = false;
+
+    Object.entries(row).forEach(([key, value]) => {
+        if (key === "業務ラベル") {
+            normalizedEntries.push(["繰り返し", repeatFlag]);
+            hasRepeatColumn = true;
+            return;
+        }
+        if (key === "繰り返し") {
+            normalizedEntries.push(["繰り返し", repeatFlag]);
+            hasRepeatColumn = true;
+            return;
+        }
+        if (key === "繰り返し回数") {
+            normalizedEntries.push(["繰り返し回数", repeatCount]);
+            hasRepeatCountColumn = true;
+            return;
+        }
+        if (key === "繰り返し率(%)") {
+            normalizedEntries.push(["繰り返し率(%)", repeatRatePct]);
+            hasRepeatRateColumn = true;
+            return;
+        }
+        if (key === "確認区分") {
+            normalizedEntries.push(["確認区分", reviewFlag]);
+            hasReviewFlagColumn = true;
+            return;
+        }
+        if (key === "簡易コメント") {
+            normalizedEntries.push(["簡易コメント", simpleComment]);
+            hasCommentColumn = true;
+            return;
+        }
+        if (key === "評価") {
+            return;
+        }
+
+        normalizedEntries.push([key, value]);
+    });
+
+    if (!hasRepeatColumn) {
+        const repeatEntry = ["繰り返し", repeatFlag];
+        normalizedEntries.unshift(repeatEntry);
+    }
+    if (!hasRepeatCountColumn) {
+        normalizedEntries.splice(Math.min(1, normalizedEntries.length), 0, ["繰り返し回数", repeatCount]);
+    }
+    if (!hasRepeatRateColumn) {
+        normalizedEntries.splice(Math.min(2, normalizedEntries.length), 0, ["繰り返し率(%)", repeatRatePct]);
+    }
+    if (!hasReviewFlagColumn) {
+        normalizedEntries.splice(Math.min(3, normalizedEntries.length), 0, ["確認区分", reviewFlag]);
+    }
+    if (!hasCommentColumn) {
+        normalizedEntries.splice(Math.min(4, normalizedEntries.length), 0, ["簡易コメント", simpleComment]);
+    }
+
+    return Object.fromEntries(normalizedEntries);
+}
+
+function normalizeLatestResult(data) {
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+        return data;
+    }
+
+    const analyses = data.analyses;
+    if (!analyses || typeof analyses !== "object" || Array.isArray(analyses)) {
+        return data;
+    }
+
+    const patternAnalysis = analyses.pattern;
+    if (!patternAnalysis || !Array.isArray(patternAnalysis.rows)) {
+        return data;
+    }
+
+    return {
+        ...data,
+        analyses: {
+            ...analyses,
+            pattern: {
+                ...patternAnalysis,
+                rows: patternAnalysis.rows.map((row) => normalizePatternAnalysisRow(row)),
+            },
+        },
+    };
+}
+
 function saveLatestResult(data) {
+    const normalizedData = normalizeLatestResult(data);
+    clearDashboardSupplement();
     try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedData));
         sessionStorage.removeItem(FLOW_SELECTION_STORAGE_KEY);
         sessionStorage.removeItem(TRANSITION_DRILLDOWN_STORAGE_KEY);
     } catch {
         try {
             const fallbackData = {
-                run_id: data.run_id,
-                source_file_name: data.source_file_name,
-                selected_analysis_keys: data.selected_analysis_keys,
-                case_count: data.case_count,
-                event_count: data.event_count,
-                applied_filters: data.applied_filters,
-                column_settings: data.column_settings,
+                run_id: normalizedData.run_id,
+                source_file_name: normalizedData.source_file_name,
+                selected_analysis_keys: normalizedData.selected_analysis_keys,
+                case_count: normalizedData.case_count,
+                event_count: normalizedData.event_count,
+                applied_filters: normalizedData.applied_filters,
+                column_settings: normalizedData.column_settings,
                 analyses: {},
             };
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(fallbackData));
@@ -236,7 +786,7 @@ function loadLatestResult() {
     }
 
     try {
-        return JSON.parse(storedValue);
+        return normalizeLatestResult(JSON.parse(storedValue));
     } catch {
         sessionStorage.removeItem(STORAGE_KEY);
         return null;
@@ -269,6 +819,9 @@ function buildTopPageState() {
         filter_value_state: getCurrentFilterValueState(),
         date_from: String(analysisDateFromInput?.value || "").trim(),
         date_to: String(analysisDateToInput?.value || "").trim(),
+        diagnostics_sample_limit: String(
+            diagnosticsSampleLimitInput?.value || DEFAULT_LOG_DIAGNOSTIC_SAMPLE_ROW_LIMIT,
+        ).trim(),
     };
 }
 
@@ -302,6 +855,11 @@ function restoreTopPageState(state) {
     }
     if (analysisDateToInput) {
         analysisDateToInput.value = state.date_to || "";
+    }
+    if (diagnosticsSampleLimitInput) {
+        diagnosticsSampleLimitInput.value = String(
+            state.diagnostics_sample_limit || DEFAULT_LOG_DIAGNOSTIC_SAMPLE_ROW_LIMIT,
+        ).trim();
     }
 
     filterColumnRefs.forEach((filterRef, index) => {
@@ -476,7 +1034,8 @@ function renderFilterValueSelectors(profilePayload) {
             filterRef.valueLabel.textContent = "値";
         }
 
-        replaceSelectOptions(filterRef.valueSelect, options, selectedValue, "全て");
+        const valuePlaceholder = definition.column_name ? "全て（グループ集計）" : "全て";
+        replaceSelectOptions(filterRef.valueSelect, options, selectedValue, valuePlaceholder);
         filterRef.valueSelect.disabled = !definition.column_name;
     });
 
@@ -486,22 +1045,22 @@ function renderFilterValueSelectors(profilePayload) {
 
     filterSelectionNote.textContent = selectedFilters.length
         ? `現在の分析対象条件: ${selectedFilters.join(" / ")}`
-        : "フィルターごとに対象列を設定すると、絞り込み値を選択できます。";
+        : "分析対象条件ごとに対象列を設定すると、絞り込み値を選択できます。";
 }
 
 function buildMissingCountText(diagnostics) {
     const missingCounts = diagnostics?.missing_counts || {};
     const items = [
-        `Case ID ${missingCounts.case_id ?? "-"}`,
-        `Activity ${missingCounts.activity ?? "-"}`,
-        `Timestamp ${missingCounts.timestamp ?? "-"}`,
+        `ケースID ${missingCounts.case_id ?? "-"}`,
+        `アクティビティ ${missingCounts.activity ?? "-"}`,
+        `タイムスタンプ ${missingCounts.timestamp ?? "-"}`,
     ];
     return items.join(" / ");
 }
 
 function buildLogPeriodText(diagnostics) {
     if (!diagnostics?.time_range?.min || !diagnostics?.time_range?.max) {
-        return "Case ID / Activity / Timestamp を選択すると表示します。";
+        return "ケースID / アクティビティ / タイムスタンプを選択すると表示します。";
     }
     return `${diagnostics.time_range.min} 〜 ${diagnostics.time_range.max}`;
 }
@@ -575,7 +1134,7 @@ function renderDiagnostics(profilePayload) {
         <p class="panel-note">重複行は全列完全一致で判定しています。</p>
         <p class="panel-note">ヘッダー一覧: ${escapeHtml((diagnostics.headers || []).join(", "))}</p>
         <div class="table-wrap diagnostics-table-wrap">
-            <table>
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th>列名</th>
@@ -614,6 +1173,8 @@ function renderProfilePayload(profilePayload) {
     renderFilterValueSelectors(currentProfilePayload);
     renderDiagnostics(currentProfilePayload);
     updateColumnSourceNote(currentProfilePayload?.source_file_name || "");
+    updateSetupSummary(loadLatestResult(), currentDashboardSupplement);
+    syncAnalysisSelectionChips();
 }
 
 function appendMappingSettings(formData) {
@@ -623,6 +1184,34 @@ function appendMappingSettings(formData) {
             formData.set(fieldName, fieldValue);
         }
     });
+}
+
+function getDiagnosticsSampleLimit() {
+    const rawValue = String(
+        diagnosticsSampleLimitInput?.value || DEFAULT_LOG_DIAGNOSTIC_SAMPLE_ROW_LIMIT,
+    ).trim();
+    const numericValue = Number.parseInt(rawValue, 10);
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+        return DEFAULT_LOG_DIAGNOSTIC_SAMPLE_ROW_LIMIT;
+    }
+
+    return numericValue;
+}
+
+function appendDiagnosticsSettings(formData) {
+    appendMappingSettings(formData);
+    formData.set("sample_row_limit", String(getDiagnosticsSampleLimit()));
+}
+
+function triggerFileDownload(blob, fileName) {
+    const downloadUrl = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = downloadUrl;
+    downloadLink.download = fileName;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
+    URL.revokeObjectURL(downloadUrl);
 }
 
 async function fetchLogProfile(file) {
@@ -650,7 +1239,7 @@ async function fetchLogDiagnostics(file) {
     if (file) {
         formData.append("csv_file", file);
     }
-    appendMappingSettings(formData);
+    appendDiagnosticsSettings(formData);
 
     const response = await fetch("/api/log-diagnostics", {
         method: "POST",
@@ -663,6 +1252,58 @@ async function fetchLogDiagnostics(file) {
     }
 
     return payload;
+}
+
+async function downloadLogDiagnosticsExcel() {
+    const validationError = (
+        validateFileSelectionState()
+        || validateColumnSelections()
+        || validateFilterColumnSelections()
+    );
+    if (validationError) {
+        setStatus(validationError, "error");
+        return;
+    }
+
+    const formData = new FormData();
+    const selectedFile = csvFileInput?.files?.[0] || null;
+    if (selectedFile) {
+        formData.append("csv_file", selectedFile);
+    }
+    appendDiagnosticsSettings(formData);
+
+    isDownloadingDiagnosticsExcel = true;
+    syncSubmitState();
+    setStatus("ログ診断Excelを出力しています...", "info");
+
+    try {
+        const response = await fetch("/api/log-diagnostics-excel", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!response.ok) {
+            let errorMessage = "ログ診断Excelの出力に失敗しました。";
+            try {
+                const payload = await response.json();
+                errorMessage = payload.error || errorMessage;
+            } catch {
+                // Keep the default message when the response body is not JSON.
+            }
+            throw new Error(errorMessage);
+        }
+
+        const blob = await response.blob();
+        const downloadFileName = getDownloadFileName(response, "log_diagnostics.xlsx");
+        triggerFileDownload(blob, downloadFileName);
+        setStatus("ログ診断Excelを出力しました。", "success");
+        saveTopPageState();
+    } catch (error) {
+        setStatus(error.message, "error");
+    } finally {
+        isDownloadingDiagnosticsExcel = false;
+        syncSubmitState();
+    }
 }
 
 async function refreshLogProfile() {
@@ -726,6 +1367,9 @@ async function runLogDiagnostics() {
     const currentVersion = diagnosticRequestVersion + 1;
     diagnosticRequestVersion = currentVersion;
     isRunningDiagnostics = true;
+    if (diagnosticsSection) {
+        diagnosticsSection.open = true;
+    }
     syncSubmitState();
     diagnosticsPanel.innerHTML = '<p class="panel-note">読み込み中...</p>';
     setStatus("ログ診断を実行しています...", "info");
@@ -760,11 +1404,11 @@ function validateColumnSelections() {
     const timestampColumn = String(timestampColumnSelect?.value || "").trim();
 
     if (!caseIdColumn || !activityColumn || !timestampColumn) {
-        return "Case ID列 / Activity列 / Timestamp列を選択してください。";
+        return "ケースID列 / アクティビティ列 / タイムスタンプ列を選択してください。";
     }
 
     if (new Set([caseIdColumn, activityColumn, timestampColumn]).size !== 3) {
-        return "Case ID列 / Activity列 / Timestamp列にはそれぞれ異なる列を選択してください。";
+        return "ケースID列 / アクティビティ列 / タイムスタンプ列にはそれぞれ異なる列を選択してください。";
     }
 
     return "";
@@ -844,63 +1488,505 @@ function buildAppliedFilterSummary(appliedFilters = {}, columnSettings = {}) {
     return appliedItems.length ? appliedItems.join(" / ") : "フィルタ未適用";
 }
 
-function renderSummary(data) {
-    const appliedFilterSummary = buildAppliedFilterSummary(data.applied_filters, data.column_settings);
-    summaryPanel.className = "summary-panel";
+function buildFilterChipItems(appliedFilters = {}, columnSettings = {}) {
+    const filterDefinitions = Array.isArray(columnSettings?.filters) ? columnSettings.filters : [];
+    const labelMap = new Map(filterDefinitions.map((definition) => [definition.slot, definition.label]));
+    const columnNameMap = new Map(filterDefinitions.map((definition) => [definition.slot, definition.column_name]));
+    const chips = [];
+
+    if (appliedFilters?.date_from || appliedFilters?.date_to) {
+        chips.push({
+            icon: "📅",
+            text: appliedFilters?.date_from && appliedFilters?.date_to
+                ? `${appliedFilters.date_from} - ${appliedFilters.date_to}`
+                : appliedFilters?.date_from
+                    ? `開始日 ${appliedFilters.date_from}`
+                    : `終了日 ${appliedFilters.date_to}`,
+        });
+    } else {
+        chips.push({ icon: "📅", text: "全期間" });
+    }
+
+    FILTER_SLOT_KEYS.forEach((slot, index) => {
+        const colName = columnNameMap.get(slot);
+        if (appliedFilters?.[slot]) {
+            chips.push({
+                icon: ["🏢", "👤", "🏷"][index] || "•",
+                text: `${labelMap.get(slot) || DEFAULT_FILTER_LABELS[slot]}: ${appliedFilters[slot]}`,
+            });
+        } else if (colName) {
+            chips.push({
+                icon: "📊",
+                text: `${labelMap.get(slot) || DEFAULT_FILTER_LABELS[slot]} グループ集計`,
+            });
+        }
+    });
+
+    return chips;
+}
+
+function renderFilterChipBar(appliedFilters = {}, columnSettings = {}) {
+    if (!filterChipBar) {
+        return;
+    }
+
+    const chips = buildFilterChipItems(appliedFilters, columnSettings);
+    filterChipBar.innerHTML = `
+        <div class="dashboard-filter-chipbar-items">
+            ${chips.map((chip) => `
+                <span class="chip">
+                    <span>${escapeHtml(chip.icon)}</span>
+                    <span>${escapeHtml(chip.text)}</span>
+                    <span class="chip-close" aria-hidden="true">×</span>
+                </span>
+            `).join("")}
+            <button type="button" class="chip chip-secondary dashboard-filter-add">＋ フィルター追加</button>
+        </div>
+        <div class="dashboard-filter-chipbar-actions">
+            <span class="dashboard-filter-chipbar-note">${escapeHtml(buildAppliedFilterSummary(appliedFilters, columnSettings))}</span>
+        </div>
+    `;
+
+    filterChipBar.querySelector(".dashboard-filter-add")?.addEventListener("click", () => {
+        setSetupSectionOpen(true);
+        filterColumnRefs[1]?.columnSelect?.focus();
+    });
+}
+
+async function fetchDashboardSupplementPayload(runId, analysisKey) {
+    const params = new URLSearchParams({
+        row_limit: "0",
+        include_dashboard: "true",
+        include_impact: "false",
+        include_root_cause: "false",
+        include_insights: "true",
+    });
+    const response = await fetch(
+        `/api/runs/${encodeURIComponent(runId)}/analyses/${encodeURIComponent(analysisKey)}?${params.toString()}`,
+    );
+    const payload = await response.json();
+
+    if (!response.ok) {
+        throw new Error(payload.error || "ダッシュボード要約の取得に失敗しました。");
+    }
+
+    return payload;
+}
+
+async function hydrateDashboardSupplement(runId, analyses = {}) {
+    const analysisKey = getDashboardAnalysisKey(analyses);
+    if (!runId || !analysisKey) {
+        clearDashboardSupplement();
+        updateSetupSummary(loadLatestResult(), null);
+        renderInsightPanel(null, "hidden");
+        return;
+    }
+
+    if (
+        currentDashboardSupplement?.run_id === runId
+        && currentDashboardSupplement?.analysis_key === analysisKey
+    ) {
+        const latestResult = loadLatestResult();
+        if (latestResult?.run_id === runId) {
+            renderSummary(latestResult, currentDashboardSupplement);
+            renderInsightPanel(currentDashboardSupplement, "ready");
+            updateSetupSummary(latestResult, currentDashboardSupplement);
+        }
+        return;
+    }
+
+    const requestVersion = dashboardSupplementRequestVersion + 1;
+    dashboardSupplementRequestVersion = requestVersion;
+
+    try {
+        const payload = await fetchDashboardSupplementPayload(runId, analysisKey);
+        if (requestVersion !== dashboardSupplementRequestVersion) {
+            return;
+        }
+
+        const supplement = {
+            run_id: payload.run_id,
+            analysis_key: analysisKey,
+            dashboard: payload.dashboard || {},
+            impact: payload.impact || {},
+            insights: payload.insights || {},
+        };
+        saveDashboardSupplement(supplement);
+
+        const latestResult = loadLatestResult();
+        if (latestResult?.run_id === runId) {
+            renderSummary(latestResult, supplement);
+            renderInsightPanel(supplement, "ready");
+            updateSetupSummary(latestResult, supplement);
+        }
+    } catch {
+        if (requestVersion !== dashboardSupplementRequestVersion) {
+            return;
+        }
+        clearDashboardSupplement();
+
+        const latestResult = loadLatestResult();
+        if (latestResult?.run_id === runId) {
+            renderSummary(latestResult, null);
+            renderInsightPanel(null, "error");
+            updateSetupSummary(latestResult, null);
+        }
+    }
+}
+
+function renderSummary(data, supplement = currentDashboardSupplement) {
+    if (!data) {
+        summaryPanel.className = "summary-panel hidden";
+        summaryPanel.innerHTML = "";
+        renderFilterChipBar();
+        return;
+    }
+
+    const matchedSupplement = supplement?.run_id === data.run_id ? supplement : null;
+    const dashboard = matchedSupplement?.dashboard || {};
+    const diagnostics = currentProfilePayload?.diagnostics || {};
+    const activityTypeCount = dashboard?.activity_type_count || diagnostics?.activity_type_count || 0;
+    const avgDurationText = dashboard?.avg_case_duration_text || "算出中";
+    const avgDurationSubtext = dashboard?.median_case_duration_text
+        ? `中央値 ${dashboard.median_case_duration_text}`
+        : "中央値を集計中";
+    const top10CoverageText = Number.isFinite(Number(dashboard?.top10_variant_coverage_pct))
+        ? formatPercent(dashboard.top10_variant_coverage_pct, 1)
+        : "算出中";
+    const top10CoverageSubtext = dashboard?.top_bottleneck_avg_wait_text
+        ? `改善対象 ${dashboard.top_bottleneck_avg_wait_text}`
+        : "上位10パターンを集計中";
+    const bottleneckHeadline = dashboard?.top_bottleneck_transition_label || "集計中";
+    const bottleneckSubtext = dashboard?.top_bottleneck_avg_wait_text
+        ? `平均 ${dashboard.top_bottleneck_avg_wait_text}`
+        : "平均待ち時間を算出中";
+
+    renderFilterChipBar(data.applied_filters, data.column_settings);
+
+    summaryPanel.className = "summary-panel dashboard-summary-panel dashboard-summary-panel--kpi";
     summaryPanel.innerHTML = `
-        <article class="summary-card">
-            <span class="summary-label">入力ファイル</span>
-            <strong>${escapeHtml(data.source_file_name)}</strong>
-        </article>
-        <article class="summary-card">
-            <span class="summary-label">ケース数</span>
-            <strong>${escapeHtml(data.case_count)}</strong>
-        </article>
-        <article class="summary-card">
-            <span class="summary-label">イベント数</span>
-            <strong>${escapeHtml(data.event_count)}</strong>
-        </article>
-        <p class="summary-inline-note">適用条件: ${escapeHtml(appliedFilterSummary)}</p>
+        <div class="dashboard-kpi-grid">
+            <article class="kpi-card dashboard-kpi-card">
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--blue">📋</div>
+                <div>
+                    <div class="kpi-label">ケース数</div>
+                    <div class="kpi-value">${escapeHtml(formatNumber(data.case_count))}</div>
+                    <div class="kpi-sub">${escapeHtml(formatNumber(data.event_count))} イベント</div>
+                </div>
+            </article>
+            <article class="kpi-card dashboard-kpi-card">
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--indigo">🔢</div>
+                <div>
+                    <div class="kpi-label">アクティビティ種類</div>
+                    <div class="kpi-value">${escapeHtml(formatNumber(activityTypeCount))}</div>
+                    <div class="kpi-sub">${escapeHtml(formatNumber(Object.keys(data.analyses || {}).length))} 分析を表示</div>
+                </div>
+            </article>
+            <article class="kpi-card dashboard-kpi-card">
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--emerald">⏱</div>
+                <div>
+                    <div class="kpi-label">平均スループット</div>
+                    <div class="kpi-value">${escapeHtml(avgDurationText)}</div>
+                    <div class="kpi-sub">${escapeHtml(avgDurationSubtext)}</div>
+                </div>
+            </article>
+            <article class="kpi-card dashboard-kpi-card">
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--amber">🎯</div>
+                <div>
+                    <div class="kpi-label">上位10パターンカバー率</div>
+                    <div class="kpi-value">${escapeHtml(top10CoverageText)}</div>
+                    <div class="kpi-sub">${escapeHtml(top10CoverageSubtext)}</div>
+                </div>
+            </article>
+            <article class="kpi-card dashboard-kpi-card dashboard-kpi-card--warning">
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--rose">⚠️</div>
+                <div>
+                    <div class="kpi-label">最大ボトルネック</div>
+                    <div class="kpi-value dashboard-kpi-value--compact">${escapeHtml(bottleneckHeadline)}</div>
+                    <div class="kpi-sub">${escapeHtml(bottleneckSubtext)}</div>
+                </div>
+            </article>
+        </div>
+        ${data.group_mode && data.group_summary ? buildGroupKpiCards(data.group_summary, data.group_columns || []) : ""}
     `;
 }
 
-function buildResultHeader(analysisKey, analysis, previewRows) {
-    const totalRowCount = analysis.row_count ?? analysis.rows.length;
-    const previewMessage = totalRowCount > previewRows.length
-        ? `先頭 ${previewRows.length} 件を表示 / 全 ${totalRowCount} 件`
-        : `全 ${totalRowCount} 件を表示`;
+function buildGroupKpiCards(groupSummary, groupColumns) {
+    if (!groupColumns.length || !groupSummary) return "";
+    const firstCol = groupColumns[0];
+    const colData = groupSummary[firstCol];
+    if (!colData) return "";
+
+    const entries = Object.entries(colData).sort((a, b) => b[1].case_count - a[1].case_count);
+    if (!entries.length) return "";
+
+    const maxCaseCount = Math.max(...entries.map(([, v]) => v.case_count || 0)) || 1;
+    const maxEventCount = Math.max(...entries.map(([, v]) => v.event_count || 0)) || 1;
+
+    const caseRows = entries.map(([label, vals]) => {
+        const pct = Math.round((vals.case_count / maxCaseCount) * 100);
+        return `
+            <div class="group-kpi-row">
+                <span class="group-kpi-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+                <div class="group-kpi-bar-track"><div class="group-kpi-bar-fill" style="width:${pct}%"></div></div>
+                <span class="group-kpi-value">${escapeHtml(formatNumber(vals.case_count))}</span>
+            </div>
+        `;
+    }).join("");
+
+    const eventRows = entries.map(([label, vals]) => {
+        const pct = Math.round((vals.event_count / maxEventCount) * 100);
+        return `
+            <div class="group-kpi-row">
+                <span class="group-kpi-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+                <div class="group-kpi-bar-track"><div class="group-kpi-bar-fill group-kpi-bar-fill--event" style="width:${pct}%"></div></div>
+                <span class="group-kpi-value">${escapeHtml(formatNumber(vals.event_count))}</span>
+            </div>
+        `;
+    }).join("");
+
+    const hasDuration = entries.some(([, v]) => v.avg_duration_min != null);
+    const durationCard = hasDuration ? (() => {
+        const maxDur = Math.max(...entries.map(([, v]) => v.avg_duration_min || 0)) || 1;
+        const durRows = entries.map(([label, vals]) => {
+            const dur = vals.avg_duration_min ?? 0;
+            const pct = Math.round((dur / maxDur) * 100);
+            return `
+                <div class="group-kpi-row">
+                    <span class="group-kpi-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+                    <div class="group-kpi-bar-track"><div class="group-kpi-bar-fill group-kpi-bar-fill--duration" style="width:${pct}%"></div></div>
+                    <span class="group-kpi-value">${escapeHtml(String(dur.toFixed ? dur.toFixed(1) : dur))}分</span>
+                </div>
+            `;
+        }).join("");
+        return `
+            <div class="group-kpi-card">
+                <div class="group-kpi-title">📊 ${escapeHtml(firstCol)} 別 平均処理時間(分)</div>
+                <div class="group-kpi-card-body">${durRows}</div>
+            </div>
+        `;
+    })() : "";
 
     return `
-        <div class="result-header">
-            <div>
-                <h2>${escapeHtml(analysis.analysis_name)}</h2>
-                <p class="result-meta">${escapeHtml(previewMessage)}</p>
+        <div class="group-kpi-panel">
+            <div class="group-kpi-card">
+                <div class="group-kpi-title">📊 ${escapeHtml(firstCol)} 別 ケース数</div>
+                <div class="group-kpi-card-body">${caseRows}</div>
             </div>
-            <a href="${buildAnalysisDetailHref(analysisKey, analysis.run_id || "")}" class="detail-link">詳細ページ</a>
+            <div class="group-kpi-card">
+                <div class="group-kpi-title">📊 ${escapeHtml(firstCol)} 別 イベント数</div>
+                <div class="group-kpi-card-body">${eventRows}</div>
+            </div>
+            ${durationCard}
         </div>
     `;
 }
 
-function renderAnalysisPanels(analyses, runId) {
-    resultPanels.innerHTML = "";
+function setActiveAnalysisTab(activeKey) {
+    resultPanels.querySelectorAll("[data-analysis-tab]").forEach((buttonElement) => {
+        buttonElement.classList.toggle(
+            "active",
+            String(buttonElement.dataset.analysisTab || "") === String(activeKey || ""),
+        );
+    });
 
-    Object.entries(analyses || {}).forEach(([analysisKey, analysis]) => {
-        const previewRows = (analysis.rows || [])
-            .slice(0, PREVIEW_ROW_COUNT)
-            .map((row, index) => ({ ...row, __rowIndex: index }));
-        const section = document.createElement("section");
-        section.className = "result-panel";
-        section.innerHTML = `
-            ${buildResultHeader(analysisKey, { ...analysis, run_id: runId }, previewRows)}
-            ${buildTable(previewRows, { analysisKey, runId })}
-        `;
-        resultPanels.appendChild(section);
+    resultPanels.querySelectorAll("[data-analysis-panel]").forEach((panelElement) => {
+        panelElement.classList.toggle(
+            "active",
+            String(panelElement.dataset.analysisPanel || "") === String(activeKey || ""),
+        );
     });
 }
 
+function findFilterSlotByColumn(columnName) {
+    return filterColumnRefs.findIndex(
+        (ref) => String(ref.columnSelect?.value || "").trim() === String(columnName || "").trim(),
+    );
+}
+
+function buildGroupTabBar(rows, groupColumns, activeValue, onSelect) {
+    if (!groupColumns.length || !rows.length) return "";
+    const firstGroupCol = groupColumns[0];
+    const uniqueValues = [...new Set(rows.map((r) => String(r[firstGroupCol] ?? "")).filter(Boolean))].sort();
+    if (!uniqueValues.length) return "";
+
+    const tabsHtml = [
+        `<button type="button" class="tab group-tab ${!activeValue ? "active" : ""}" data-group-value="">全体</button>`,
+        ...uniqueValues.map((val) =>
+            `<button type="button" class="tab group-tab ${activeValue === val ? "active" : ""}" data-group-value="${escapeHtml(val)}">${escapeHtml(val)}</button>`
+        ),
+    ].join("");
+
+    return `<div class="tab-bar group-tab-bar" data-group-col="${escapeHtml(firstGroupCol)}">${tabsHtml}</div>`;
+}
+
+function buildBreadcrumbNav(drillPath) {
+    if (!drillPath.length) return "";
+    const crumbs = [
+        `<span class="breadcrumb-item breadcrumb-item--link" data-drill-index="-1">全体</span>`,
+        ...drillPath.map((entry, index) =>
+            index < drillPath.length - 1
+                ? `<span class="breadcrumb-sep">›</span><span class="breadcrumb-item breadcrumb-item--link" data-drill-index="${index}">${escapeHtml(entry.value)}</span>`
+                : `<span class="breadcrumb-sep">›</span><span class="breadcrumb-item">${escapeHtml(entry.value)}</span>`
+        ),
+    ].join("");
+    return `<nav class="breadcrumb-nav">${crumbs}</nav>`;
+}
+
+function renderAnalysisPanels(analyses, runId, groupColumns = []) {
+    const analysisEntries = Object.entries(analyses || {});
+    if (!analysisEntries.length) {
+        resultPanels.className = "result-stack hidden";
+        resultPanels.innerHTML = "";
+        return;
+    }
+
+    const firstAnalysisKey = analysisEntries[0][0];
+    const isGroupMode = groupColumns.length > 0;
+
+    resultPanels.className = "analysis-section dashboard-analysis-shell";
+    resultPanels.innerHTML = `
+        <div class="tab-bar dashboard-tab-bar">
+            ${analysisEntries.map(([analysisKey, analysis], index) => `
+                <button
+                    type="button"
+                    class="tab dashboard-tab ${index === 0 ? "active" : ""}"
+                    data-analysis-tab="${escapeHtml(analysisKey)}"
+                >
+                    ${escapeHtml(analysis.analysis_name || analysisKey)}
+                </button>
+            `).join("")}
+        </div>
+        <div class="tab-content dashboard-tab-content">
+            ${analysisEntries.map(([analysisKey, analysis], index) => {
+                const allRows = analysis.rows || [];
+
+                const renderPanelContent = (filteredRows, drillPath = []) => {
+                    const previewRows = buildDashboardPreviewRows(analysisKey, filteredRows);
+                    const activeGroupValue = drillPath.length ? drillPath[drillPath.length - 1].value : "";
+                    const groupTabBarHtml = isGroupMode
+                        ? buildGroupTabBar(allRows, groupColumns, activeGroupValue, null)
+                        : "";
+                    const breadcrumbHtml = drillPath.length ? buildBreadcrumbNav(drillPath) : "";
+                    const tableHtml = isGroupMode
+                        ? buildGroupedTable(previewRows, groupColumns, { analysisKey, runId })
+                        : buildTable(previewRows, { analysisKey, runId });
+
+                    return `
+                        ${breadcrumbHtml}
+                        ${groupTabBarHtml}
+                        ${tableHtml}
+                    `;
+                };
+
+                const initialPreview = buildDashboardPreviewRows(analysisKey, allRows);
+                const initialGroupTabBar = isGroupMode ? buildGroupTabBar(allRows, groupColumns, "", null) : "";
+                const initialTable = isGroupMode
+                    ? buildGroupedTable(initialPreview, groupColumns, { analysisKey, runId })
+                    : buildTable(initialPreview, { analysisKey, runId });
+
+                return `
+                    <section
+                        class="tab-panel dashboard-tab-panel ${index === 0 ? "active" : ""}"
+                        data-analysis-panel="${escapeHtml(analysisKey)}"
+                        data-analysis-key="${escapeHtml(analysisKey)}"
+                    >
+                        <div class="dashboard-preview-shell">
+                            <div class="dashboard-preview-head">
+                                <div>
+                                    <h2>${escapeHtml(analysis.analysis_name || analysisKey)}</h2>
+                                    <p class="dashboard-preview-meta">${escapeHtml(buildPreviewMessage(analysis, initialPreview))}</p>
+                                </div>
+                                <a href="${buildAnalysisDetailHref(analysisKey, runId || "")}" class="detail-link">詳細ページ</a>
+                            </div>
+                            <div class="group-content-area">
+                                ${initialGroupTabBar}
+                                ${initialTable}
+                            </div>
+                            <div class="dashboard-preview-foot">
+                                <a href="${buildAnalysisDetailHref(analysisKey, runId || "")}" class="detail-link">詳細ページで続きを見る</a>
+                            </div>
+                        </div>
+                    </section>
+                `;
+            }).join("")}
+        </div>
+    `;
+
+    resultPanels.querySelectorAll("[data-analysis-tab]").forEach((buttonElement) => {
+        buttonElement.addEventListener("click", () => {
+            setActiveAnalysisTab(buttonElement.dataset.analysisTab || firstAnalysisKey);
+        });
+    });
+
+    // グループタブのイベントリスナー設定（サーバー再分析）
+    if (isGroupMode) {
+        resultPanels.querySelectorAll(".group-tab-bar").forEach((tabBar) => {
+            const groupCol = tabBar.dataset.groupCol;
+
+            tabBar.querySelectorAll(".group-tab").forEach((tabBtn) => {
+                tabBtn.addEventListener("click", () => {
+                    const selectedValue = tabBtn.dataset.groupValue;
+                    const slotIndex = findFilterSlotByColumn(groupCol);
+
+                    if (selectedValue) {
+                        // グループ値を選択 → そのスロットをフィルタリングモードに切り替えて再分析
+                        if (slotIndex >= 0) {
+                            // 下位スロットのフィルター値をクリア（次の階層はグループモードのまま）
+                            for (let i = slotIndex + 1; i < filterColumnRefs.length; i++) {
+                                if (filterColumnRefs[i].valueSelect) {
+                                    filterColumnRefs[i].valueSelect.value = "";
+                                }
+                            }
+                            filterColumnRefs[slotIndex].valueSelect.value = selectedValue;
+                        }
+                    } else {
+                        // 「全体」タブ → 全スロットのフィルター値をクリアして再分析
+                        filterColumnRefs.forEach((ref) => {
+                            if (ref.valueSelect) ref.valueSelect.value = "";
+                        });
+                    }
+
+                    form.requestSubmit();
+                });
+            });
+        });
+
+        // パンくずの「戻る」クリック → 上位階層に戻って再分析
+        resultPanels.querySelectorAll(".breadcrumb-item--link").forEach((crumb) => {
+            crumb.addEventListener("click", () => {
+                const drillIndex = Number.parseInt(crumb.dataset.drillIndex ?? "-1", 10);
+                // drillIndex=-1 → 全体（全スロットクリア）
+                // drillIndex=n → n+1階層より下をクリア
+                const clearFrom = drillIndex + 1;
+                for (let i = clearFrom; i < filterColumnRefs.length; i++) {
+                    if (filterColumnRefs[i].valueSelect) {
+                        filterColumnRefs[i].valueSelect.value = "";
+                    }
+                }
+                form.requestSubmit();
+            });
+        });
+    }
+}
+
 function renderDashboard(data) {
-    renderSummary(data);
-    renderAnalysisPanels(data.analyses, data.run_id || "");
+    const normalizedData = normalizeLatestResult(data);
+    const matchedSupplement = currentDashboardSupplement?.run_id === normalizedData.run_id
+        ? currentDashboardSupplement
+        : null;
+
+    renderSummary(normalizedData, matchedSupplement);
+    renderInsightPanel(
+        matchedSupplement,
+        normalizedData.run_id && !matchedSupplement ? "loading" : matchedSupplement ? "ready" : "hidden",
+    );
+    renderAnalysisPanels(normalizedData.analyses, normalizedData.run_id || "", normalizedData.group_columns || []);
+    updateSetupSummary(normalizedData, matchedSupplement);
+
+    if (normalizedData.run_id) {
+        void hydrateDashboardSupplement(normalizedData.run_id, normalizedData.analyses || {});
+    }
 }
 
 form.addEventListener("submit", async (event) => {
@@ -916,6 +2002,8 @@ form.addEventListener("submit", async (event) => {
     syncSubmitState();
     setStatus("分析を実行しています...", "info");
     summaryPanel.className = "summary-panel hidden";
+    renderInsightPanel(null, "hidden");
+    resultPanels.className = "result-stack";
     resultPanels.innerHTML = "";
 
     try {
@@ -933,6 +2021,7 @@ form.addEventListener("submit", async (event) => {
         saveLatestResult(data);
         renderDashboard(data);
         saveTopPageState();
+        setSetupSectionOpen(false);
 
         setStatus("分析が完了しました。", "success");
     } catch (error) {
@@ -943,8 +2032,23 @@ form.addEventListener("submit", async (event) => {
     }
 });
 
+setupToggleButton?.addEventListener("click", () => {
+    setSetupSectionOpen(!setupSection?.classList.contains("is-open"));
+});
+
+setupSummaryOpenButton?.addEventListener("click", () => {
+    setSetupSectionOpen(true);
+    caseIdColumnSelect?.focus();
+});
+
+topOpenCsvButton?.addEventListener("click", () => {
+    setSetupSectionOpen(true);
+    csvFileInput?.click();
+});
+
 csvFileInput?.addEventListener("change", () => {
     requiresFileReselection = false;
+    setSetupSectionOpen(true);
     void refreshLogProfile();
 });
 
@@ -952,27 +2056,48 @@ csvFileInput?.addEventListener("change", () => {
     .forEach((element) => {
         element?.addEventListener("change", () => {
             hideStatus();
+            updateSetupSummary(loadLatestResult(), currentDashboardSupplement);
+            renderFilterChipBar(loadLatestResult()?.applied_filters, loadLatestResult()?.column_settings);
             saveTopPageState();
             void refreshLogProfile();
         });
     });
 
 filterColumnRefs.forEach((filterRef) => {
-    filterRef.valueSelect?.addEventListener("change", () => {
-        hideStatus();
-        saveTopPageState();
+        filterRef.valueSelect?.addEventListener("change", () => {
+            hideStatus();
+            renderFilterChipBar(loadLatestResult()?.applied_filters, loadLatestResult()?.column_settings);
+            saveTopPageState();
+        });
     });
-});
 
 [analysisDateFromInput, analysisDateToInput].forEach((element) => {
     element?.addEventListener("change", () => {
         hideStatus();
+        renderFilterChipBar(loadLatestResult()?.applied_filters, loadLatestResult()?.column_settings);
         saveTopPageState();
     });
 });
 
+form.querySelectorAll('input[name="analysis_keys"]').forEach((element) => {
+    element.addEventListener("change", () => {
+        hideStatus();
+        syncAnalysisSelectionChips();
+        saveTopPageState();
+    });
+});
+
+diagnosticsSampleLimitInput?.addEventListener("change", () => {
+    hideStatus();
+    saveTopPageState();
+});
+
 diagnosticsButton?.addEventListener("click", () => {
     void runLogDiagnostics();
+});
+
+diagnosticsExcelButton?.addEventListener("click", () => {
+    void downloadLogDiagnosticsExcel();
 });
 
 resetFilterButton?.addEventListener("click", () => {
@@ -984,19 +2109,24 @@ resetFilterButton?.addEventListener("click", () => {
         if (filterRef.valueSelect) filterRef.valueSelect.disabled = true;
     });
     if (filterSelectionNote) {
-        filterSelectionNote.textContent = "フィルターごとに対象列を設定すると、絞り込み値を選択できます。";
+        filterSelectionNote.textContent = "分析対象条件ごとに対象列を設定すると、絞り込み値を選択できます。";
     }
     hideStatus();
+    renderFilterChipBar();
     saveTopPageState();
 });
 
 const latestResult = loadLatestResult();
+renderFilterChipBar(latestResult?.applied_filters, latestResult?.column_settings);
 if (latestResult) {
     renderDashboard(latestResult);
 }
 
 renderProfilePayload(currentProfilePayload);
 restoreTopPageState(restoredTopPageState);
+syncAnalysisSelectionChips();
+updateSetupSummary(latestResult, currentDashboardSupplement);
+setSetupSectionOpen(Boolean(requiresFileReselection));
 saveTopPageState();
 syncSubmitState();
 hideStatus();

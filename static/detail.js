@@ -57,9 +57,25 @@ let detailPageAnalysisLoader = null;
 let currentDetailColumnSettings = {};
 let currentAiInsightsPayload = null;
 let aiInsightsRequestVersion = 0;
+let previousProcessMapMouseMoveHandler = null;
+let previousProcessMapMouseUpHandler = null;
+let pendingDetailSupplementSections = new Set();
+let detailSupplementErrorMessage = "";
+let currentDetailSummaryData = null;
+let currentRenderedAnalysis = null;
+let detailSupplementRequestVersion = 0;
+let frequencyChartLimit = 10;
+let transitionChartLimit = 15;
 
 const sharedUi = window.ProcessMiningShared;
 const { buildTransitionKey, escapeHtml, fetchJson, formatDateTime, getRunId, loadLatestResult } = sharedUi;
+const DETAIL_HEAVY_FETCH_TIMEOUT_MS = 120000;
+const DETAIL_LIGHTWEIGHT_LOAD_OPTIONS = Object.freeze({
+    includeDashboard: false,
+    includeImpact: false,
+    includeRootCause: false,
+    includeInsights: false,
+});
 const setStatus = (message, type = "info") => sharedUi.setStatus(statusPanel, message, type);
 const hideStatus = () => sharedUi.hideStatus(statusPanel);
 
@@ -78,7 +94,7 @@ function buildAiInsightsApiUrl(runId, filters = activeDetailFilters, forceRefres
 async function loadAiInsightsState(runId, filters = activeDetailFilters) {
     return fetchJson(
         buildAiInsightsApiUrl(runId, filters),
-        "AI解説の状態を読み込めませんでした。",
+        "分析コメントの状態を読み込めませんでした。",
         10000
     );
 }
@@ -89,7 +105,7 @@ async function generateAiInsights(runId, filters = activeDetailFilters, forceRef
     });
     const payload = await response.json();
     if (!response.ok) {
-        throw new Error(payload.detail || payload.error || "AI解説を生成できませんでした。");
+        throw new Error(payload.detail || payload.error || "分析コメントを生成できませんでした。");
     }
     return payload;
 }
@@ -106,7 +122,7 @@ function renderAiInsightsPayload(payload, analysisName = "") {
     }
 
     const resolvedAnalysisName = payload?.analysis_name || analysisName || detailPageTitle?.textContent?.trim() || "";
-    aiInsightsTitle.textContent = resolvedAnalysisName ? `${resolvedAnalysisName} AI解説` : "AI解説";
+    aiInsightsTitle.textContent = resolvedAnalysisName ? `${resolvedAnalysisName} 分析コメント` : "分析コメント";
 
     if (!payload?.generated) {
         currentAiInsightsPayload = payload || null;
@@ -115,20 +131,19 @@ function renderAiInsightsPayload(payload, analysisName = "") {
         aiInsightsOutput.textContent = "";
         aiInsightsOutput.classList.add("hidden");
         aiInsightsButton.disabled = false;
-        aiInsightsButton.textContent = "AI解説を生成";
+        aiInsightsButton.textContent = "分析コメントを生成";
         setAiInsightsChip("未生成", "idle");
         return;
     }
 
     currentAiInsightsPayload = payload;
-    const providerLabel = payload.provider || "AI解説";
     const generatedAtLabel = payload.generated_at ? formatDateTime(payload.generated_at) : "";
-    aiInsightsMeta.textContent = generatedAtLabel ? `${providerLabel} / ${generatedAtLabel}` : providerLabel;
+    aiInsightsMeta.textContent = generatedAtLabel || "現在の分析条件に対応する解説です。";
     aiInsightsNote.textContent = payload.note || "現在の分析条件に対応する解説です。";
     aiInsightsOutput.textContent = payload.text || "";
     aiInsightsOutput.classList.toggle("hidden", !payload.text);
     aiInsightsButton.disabled = false;
-    aiInsightsButton.textContent = payload.cached ? "AI解説を再生成" : "AI解説を更新";
+    aiInsightsButton.textContent = payload.cached ? "分析コメントを再生成" : "分析コメントを更新";
 
     if (payload.mode === "rule_based") {
         setAiInsightsChip(payload.cached ? "要約保存済み" : "要約生成済み", "fallback");
@@ -143,7 +158,7 @@ function renderAiInsightsLoading(analysisName = "") {
     }
 
     const resolvedAnalysisName = analysisName || detailPageTitle?.textContent?.trim() || "";
-    aiInsightsTitle.textContent = resolvedAnalysisName ? `${resolvedAnalysisName} AI解説` : "AI解説";
+    aiInsightsTitle.textContent = resolvedAnalysisName ? `${resolvedAnalysisName} 分析コメント` : "分析コメント";
     aiInsightsMeta.textContent = "現在の分析条件に対する解説を生成しています。";
     aiInsightsNote.textContent = "生成中です。完了すると画面切替後も保持されます。";
     aiInsightsOutput.textContent = "解説を生成しています...";
@@ -178,13 +193,13 @@ function syncDetailExportPanel(analysisName = "", options = {}) {
         chips.push(`Variant #${variantId}`);
     }
     if (selectedActivity) {
-        chips.push(`Activity: ${selectedActivity}`);
+        chips.push(`アクティビティ: ${selectedActivity}`);
     }
     if (normalizedTransitionLabel) {
         chips.push(`遷移: ${normalizedTransitionLabel}`);
     }
     if (caseId) {
-        chips.push(`Case: ${caseId}`);
+        chips.push(`ケース: ${caseId}`);
     }
 
     let metaText = "この分析画面に対応する内容だけを出力します。";
@@ -193,14 +208,14 @@ function syncDetailExportPanel(analysisName = "", options = {}) {
     } else if (analysisKey === "transition") {
         metaText = "前後処理分析、ボトルネック、改善インパクトをまとめて出力します。";
     } else if (analysisKey === "pattern") {
-        metaText = "処理順パターンの統合一覧と、表示件数に応じた上位パターン詳細シートを出力します。";
+        metaText = "処理順パターンの統合一覧、パターンサマリー、表示件数に応じた上位パターン詳細シートを出力します。";
     }
 
     const selectionItems = [];
     if (variantId !== null && variantId !== undefined) selectionItems.push(`Variant #${variantId}`);
-    if (selectedActivity) selectionItems.push(`Activity「${selectedActivity}」`);
+    if (selectedActivity) selectionItems.push(`アクティビティ「${selectedActivity}」`);
     if (normalizedTransitionLabel) selectionItems.push(`遷移「${normalizedTransitionLabel}」`);
-    if (caseId) selectionItems.push(`Case「${caseId}」`);
+    if (caseId) selectionItems.push(`ケース「${caseId}」`);
 
     detailExportTitle.textContent = `${resolvedAnalysisName}のExcelレポート`;
     detailExportMeta.textContent = metaText;
@@ -321,11 +336,23 @@ function buildPatternDetailHref(runId, patternIndex) {
 // Analysis detail API helpers
 // -----------------------------------------------------------------------------
 
-function buildAnalysisDetailApiUrl(runId, rowOffset = 0, filters = activeDetailFilters) {
+function buildAnalysisDetailApiUrl(runId, rowOffset = 0, filters = activeDetailFilters, options = {}) {
+    const resolvedOptions = {
+        rowLimit: DETAIL_ROW_LIMIT,
+        includeDashboard: true,
+        includeImpact: true,
+        includeRootCause: true,
+        includeInsights: true,
+        ...options,
+    };
     const params = new URLSearchParams({
-        row_limit: String(DETAIL_ROW_LIMIT),
+        row_limit: String(Math.max(0, Number(resolvedOptions.rowLimit) || 0)),
         row_offset: String(Math.max(0, Number(rowOffset) || 0)),
     });
+    params.set("include_dashboard", resolvedOptions.includeDashboard ? "true" : "false");
+    params.set("include_impact", resolvedOptions.includeImpact ? "true" : "false");
+    params.set("include_root_cause", resolvedOptions.includeRootCause ? "true" : "false");
+    params.set("include_insights", resolvedOptions.includeInsights ? "true" : "false");
     buildFilterQueryParams(filters).forEach((value, key) => {
         params.set(key, value);
     });
@@ -358,11 +385,90 @@ function saveFlowSelection(runId, selectedVariantId, selectedActivity, selectedT
     }
 }
 
-function loadAnalysisPage(runId, rowOffset = 0, filters = activeDetailFilters) {
+function loadAnalysisPage(runId, rowOffset = 0, filters = activeDetailFilters, options = {}) {
     return fetchJson(
-        buildAnalysisDetailApiUrl(runId, rowOffset, filters),
-        "分析詳細の読み込みに失敗しました。"
+        buildAnalysisDetailApiUrl(runId, rowOffset, filters, options),
+        "分析詳細の読み込みに失敗しました。",
+        DETAIL_HEAVY_FETCH_TIMEOUT_MS
     );
+}
+
+function getInitialDetailLoadOptions() {
+    if (analysisKey === "pattern") {
+        return {
+            ...DETAIL_LIGHTWEIGHT_LOAD_OPTIONS,
+            includeImpact: true,
+        };
+    }
+    return DETAIL_LIGHTWEIGHT_LOAD_OPTIONS;
+}
+
+function getDeferredDetailLoadOptions() {
+    return {
+        rowLimit: 0,
+        includeDashboard: true,
+        includeImpact: false,
+        includeRootCause: true,
+        includeInsights: true,
+    };
+}
+
+function mergeDetailSummaryData(payload) {
+    currentDetailSummaryData = {
+        ...(currentDetailSummaryData || {}),
+        source_file_name: payload?.source_file_name ?? currentDetailSummaryData?.source_file_name,
+        case_count: payload?.case_count ?? currentDetailSummaryData?.case_count,
+        event_count: payload?.event_count ?? currentDetailSummaryData?.event_count,
+        dashboard: payload?.dashboard ?? currentDetailSummaryData?.dashboard,
+        impact: payload?.impact ?? currentDetailSummaryData?.impact,
+        insights: payload?.insights ?? currentDetailSummaryData?.insights,
+        root_cause: payload?.root_cause ?? currentDetailSummaryData?.root_cause,
+        applied_filters: payload?.applied_filters ?? currentDetailSummaryData?.applied_filters,
+        column_settings: payload?.column_settings ?? currentDetailSummaryData?.column_settings,
+    };
+    return currentDetailSummaryData;
+}
+
+async function refreshDeferredDetailSections(runId) {
+    if (!currentRenderedAnalysis) {
+        return null;
+    }
+
+    const requestVersion = detailSupplementRequestVersion + 1;
+    detailSupplementRequestVersion = requestVersion;
+    detailSupplementErrorMessage = "";
+    pendingDetailSupplementSections = new Set(["dashboard", "root_cause", "insights"]);
+
+    if (currentDetailSummaryData) {
+        renderSummary(currentDetailSummaryData, currentRenderedAnalysis);
+    }
+
+    try {
+        const supplementData = await loadAnalysisPage(
+            runId,
+            0,
+            activeDetailFilters,
+            getDeferredDetailLoadOptions(),
+        );
+
+        if (requestVersion !== detailSupplementRequestVersion) {
+            return null;
+        }
+
+        mergeDetailSummaryData(supplementData);
+        pendingDetailSupplementSections = new Set(supplementData.deferred_sections || []);
+        detailSupplementErrorMessage = "";
+        renderSummary(currentDetailSummaryData, currentRenderedAnalysis);
+        return supplementData;
+    } catch (error) {
+        if (requestVersion !== detailSupplementRequestVersion) {
+            return null;
+        }
+
+        detailSupplementErrorMessage = error.message;
+        renderSummary(currentDetailSummaryData, currentRenderedAnalysis);
+        return null;
+    }
 }
 
 async function syncAiInsightsPanel(runId, analysisName = "", { forceRefresh = false } = {}) {
@@ -393,12 +499,12 @@ async function syncAiInsightsPanel(runId, analysisName = "", { forceRefresh = fa
             return null;
         }
 
-        aiInsightsMeta.textContent = "AI解説の取得に失敗しました。";
+            aiInsightsMeta.textContent = "分析コメントの取得に失敗しました。";
         aiInsightsNote.textContent = error.message;
         aiInsightsOutput.textContent = "";
         aiInsightsOutput.classList.add("hidden");
         aiInsightsButton.disabled = false;
-        aiInsightsButton.textContent = "AI解説を生成";
+            aiInsightsButton.textContent = "分析コメントを生成";
         setAiInsightsChip("取得失敗", "error");
         return null;
     }
@@ -418,7 +524,8 @@ function buildVariantListApiUrl(runId, limit = 10, filters = activeDetailFilters
 function loadVariantList(runId, limit = 10, filters = activeDetailFilters) {
     return fetchJson(
         buildVariantListApiUrl(runId, limit, filters),
-        "Variant 一覧の読み込みに失敗しました。"
+        "バリアント一覧の読み込みに失敗しました。",
+        DETAIL_HEAVY_FETCH_TIMEOUT_MS
     );
 }
 
@@ -440,7 +547,8 @@ function buildBottleneckApiUrl(runId, limit = 5, variantId = null, filters = act
 function loadBottleneckSummary(runId, limit = 5, variantId = null, filters = activeDetailFilters) {
     return fetchJson(
         buildBottleneckApiUrl(runId, limit, variantId, filters),
-        "Bottleneck summary could not be loaded."
+        "ボトルネック概要の読み込みに失敗しました。",
+        DETAIL_HEAVY_FETCH_TIMEOUT_MS
     );
 }
 
@@ -463,7 +571,7 @@ function buildActivityCasesApiUrl(runId, activity, limit = 20, variantId = null,
 function loadActivityCases(runId, activity, limit = 20, variantId = null, filters = activeDetailFilters) {
     return fetchJson(
         buildActivityCasesApiUrl(runId, activity, limit, variantId, filters),
-        "Activity cases could not be loaded."
+        "アクティビティのケース読み込みに失敗しました。"
     );
 }
 
@@ -487,7 +595,7 @@ function buildTransitionCasesApiUrl(runId, fromActivity, toActivity, limit = 20,
 function loadTransitionCases(runId, fromActivity, toActivity, limit = 20, variantId = null, filters = activeDetailFilters) {
     return fetchJson(
         buildTransitionCasesApiUrl(runId, fromActivity, toActivity, limit, variantId, filters),
-        "Transition cases could not be loaded."
+        "遷移のケース読み込みに失敗しました。"
     );
 }
 
@@ -498,7 +606,7 @@ function buildCaseTraceApiUrl(runId, caseId) {
 function loadCaseTrace(runId, caseId) {
     return fetchJson(
         buildCaseTraceApiUrl(runId, caseId),
-        "Case trace could not be loaded."
+        "ケース追跡の読み込みに失敗しました。"
     );
 }
 
@@ -583,6 +691,13 @@ function formatDashboardMetricNumber(value) {
     return Number(value || 0).toLocaleString("ja-JP");
 }
 
+function buildDeferredSectionMessage(defaultMessage = "補助集計を読み込んでいます...") {
+    if (detailSupplementErrorMessage) {
+        return `<p class="empty-state">${escapeHtml(detailSupplementErrorMessage)}</p>`;
+    }
+    return `<p class="panel-note">${escapeHtml(defaultMessage)}</p>`;
+}
+
 function formatDashboardCoverage(coveragePct) {
     return `${Number(coveragePct || 0).toLocaleString("ja-JP", {
         minimumFractionDigits: 0,
@@ -591,12 +706,26 @@ function formatDashboardCoverage(coveragePct) {
 }
 
 function buildDashboardCardsHtml(dashboard) {
+    if (!dashboard && pendingDetailSupplementSections.has("dashboard")) {
+        return `
+            <section class="summary-panel-dashboard">
+                <div class="dashboard-header">
+                    <h2 class="dashboard-title">基本ダッシュボード</h2>
+                    <p class="dashboard-copy">分析対象条件適用後の分析要約です。バリアント選択中も全体値を表示します。</p>
+                </div>
+                <div class="dashboard-empty">
+                    ${buildDeferredSectionMessage("基本ダッシュボードを読み込んでいます...")}
+                </div>
+            </section>
+        `;
+    }
+
     if (!dashboard?.has_data) {
         return `
             <section class="summary-panel-dashboard">
                 <div class="dashboard-header">
                     <h2 class="dashboard-title">基本ダッシュボード</h2>
-                    <p class="dashboard-copy">分析対象条件適用後の分析要約です。Variant選択中も全体値を表示します。</p>
+                    <p class="dashboard-copy">分析対象条件適用後の分析要約です。バリアント選択中も全体値を表示します。</p>
                 </div>
                 <div class="dashboard-empty">
                     <p class="empty-state">条件に一致するデータがありません。</p>
@@ -623,7 +752,7 @@ function buildDashboardCardsHtml(dashboard) {
             value: dashboard.max_case_duration_text || "0s",
         },
         {
-            label: "上位10パターンカバレッジ",
+            label: "上位10バリアントカバー率",
             value: formatDashboardCoverage(dashboard.top10_variant_coverage_pct),
         },
         {
@@ -643,14 +772,16 @@ function buildDashboardCardsHtml(dashboard) {
         <section class="summary-panel-dashboard">
             <div class="dashboard-header">
                 <h2 class="dashboard-title">基本ダッシュボード</h2>
-                <p class="dashboard-copy">分析対象条件適用後の分析要約です。Variant選択中も全体値を表示します。</p>
+                <p class="dashboard-copy">分析対象条件適用後の分析要約です。バリアント選択中も全体値を表示します。</p>
             </div>
-            <div class="dashboard-grid">
+            <div class="grid-auto">
                 ${dashboardCards.map((card) => `
-                    <article class="dashboard-card">
-                        <span class="summary-label">${escapeHtml(card.label)}</span>
-                        <strong class="dashboard-value">${escapeHtml(card.value)}</strong>
-                        ${card.note ? `<p class="dashboard-note">${escapeHtml(card.note)}</p>` : ""}
+                    <article class="kpi-card">
+                        <div>
+                            <div class="kpi-label">${escapeHtml(card.label)}</div>
+                            <div class="kpi-value">${escapeHtml(card.value)}</div>
+                            ${card.note ? `<div class="kpi-sub">${escapeHtml(card.note)}</div>` : ""}
+                        </div>
                     </article>
                 `).join("")}
             </div>
@@ -674,6 +805,18 @@ function formatImpactScore(score) {
 
 
 function buildInsightsSectionHtml(insights) {
+    if (!insights && pendingDetailSupplementSections.has("insights")) {
+        return `
+            <section class="summary-panel-insights">
+                <div class="dashboard-header">
+                    <h2 class="dashboard-title">自動インサイト</h2>
+                    <p class="dashboard-copy">既存集計から重要ポイントを自動で要約しています。</p>
+                </div>
+                ${buildDeferredSectionMessage("自動インサイトを読み込んでいます...")}
+            </section>
+        `;
+    }
+
     const items = Array.isArray(insights?.items) ? insights.items : [];
     const description = insights?.description || "既存集計から重要ポイントを自動で要約しています。";
 
@@ -696,7 +839,7 @@ function buildInsightsSectionHtml(insights) {
                 <p class="dashboard-copy">${escapeHtml(description)}</p>
             </div>
             <ul class="insight-list">
-                ${items.map((item) => `<li>${escapeHtml(item.text || "")}</li>`).join("")}
+                ${items.slice(0, 5).map((item, index) => `<li><span class="insight-icon">${["📊", "📈", "⚠️", "🔍", "✅"][index] || "•"}</span><span>${escapeHtml(item.text || "")}</span></li>`).join("")}
             </ul>
         </section>
     `;
@@ -771,7 +914,7 @@ function buildImpactTableHtml(rows) {
         "ケース数",
         "平均所要時間",
         "最大所要時間",
-        "待ち時間シェア(%)",
+        "所要時間シェア(%)",
         "改善インパクト",
         "改善インパクト比率(%)",
     ];
@@ -849,6 +992,20 @@ function buildRootCauseGroupHtml(group) {
 }
 
 function buildRootCauseSectionHtml(rootCause) {
+    if (!rootCause && pendingDetailSupplementSections.has("root_cause")) {
+        return `
+            <section class="root-cause-panel">
+                <div class="result-header">
+                    <div>
+                        <h2>原因分析</h2>
+                        <p class="result-meta">グループ/カテゴリー列ごとに、値別のケース処理時間を比較します。</p>
+                    </div>
+                </div>
+                ${buildDeferredSectionMessage("原因分析を読み込んでいます...")}
+            </section>
+        `;
+    }
+
     if (!rootCause?.has_data) {
         return `
             <section class="root-cause-panel">
@@ -893,6 +1050,20 @@ function buildRootCauseSectionHtml(rootCause) {
 }
 
 function buildImpactSectionHtml(impact, viewState = getDefaultImpactViewState()) {
+    if (!impact && pendingDetailSupplementSections.has("impact")) {
+        return `
+            <section class="impact-panel">
+                <div class="result-header">
+                    <div>
+                        <h2>改善インパクト分析</h2>
+                        <p class="result-meta">平均所要時間 × 件数をもとに、改善効果の大きい遷移を表示しています。</p>
+                    </div>
+                </div>
+                ${buildDeferredSectionMessage("改善インパクト分析を読み込んでいます...")}
+            </section>
+        `;
+    }
+
     if (!impact?.has_data) {
         return `
             <section class="impact-panel">
@@ -955,7 +1126,7 @@ function buildImpactSectionHtml(impact, viewState = getDefaultImpactViewState())
                     <input id="impact-min-case-count-input" type="number" min="0" step="1" value="${escapeHtml(safeMinCaseCount)}" placeholder="0">
                 </label>
                 <label class="field">
-                    <span>最低平均所要時間(h)</span>
+                    <span>最低平均所要時間(時間)</span>
                     <input id="impact-min-avg-hours-input" type="number" min="0" step="0.1" value="${escapeHtml(safeMinAvgDurationHours)}" placeholder="0">
                 </label>
                 <label class="field">
@@ -989,14 +1160,33 @@ function buildVariantCoverageHtml(coverage) {
         return '<p class="panel-note">カバー率を計算できませんでした。</p>';
     }
 
-    return `
-        <span class="variant-coverage-label">${escapeHtml(coverage.display_label || `上位${coverage.displayed_variant_count}件カバー率`)}</span>
-        <strong class="variant-coverage-value">${escapeHtml(formatVariantRatio(coverage.ratio))}%</strong>
-        <span class="variant-coverage-sub">
-            ${escapeHtml(Number(coverage.covered_case_count || 0).toLocaleString("ja-JP"))}
-            / ${escapeHtml(Number(coverage.total_case_count || 0).toLocaleString("ja-JP"))} 件
-        </span>
-    `;
+    const totalCount = Math.max(0, Number(coverage.total_case_count || 0));
+    const coveredCount = Math.min(totalCount, Math.max(0, Number(coverage.covered_case_count || 0)));
+    const otherCount = Math.max(0, totalCount - coveredCount);
+    const coverageRatio = totalCount > 0 ? coveredCount / totalCount : 0;
+    const coveragePct = Math.round(coverageRatio * 100);
+
+    const donutSegments = [
+        {
+            label: coverage.display_label || `上位${coverage.displayed_variant_count}件`,
+            ratio: coverageRatio,
+            color: "#3b82f6",
+            tooltip: `対象: ${coveredCount.toLocaleString("ja-JP")} 件 (${coveragePct}%)`,
+        },
+        ...(otherCount > 0 ? [{
+            label: "その他",
+            ratio: otherCount / Math.max(1, totalCount),
+            color: "#e2e8f0",
+            tooltip: `その他: ${otherCount.toLocaleString("ja-JP")} 件`,
+        }] : []),
+    ];
+
+    return buildDonutChartMarkup(
+        donutSegments,
+        totalCount,
+        coverage.display_label || `上位${coverage.displayed_variant_count}件カバー率`,
+        `${coveragePct}%`,
+    );
 }
 
 function getDefaultVariantViewState() {
@@ -1020,6 +1210,7 @@ function buildVariantSearchText(variant) {
 
 function buildVariantCoveragePayload(variantItems, totalCaseCount, displayLimit = 10, options = {}) {
     const isAllDisplay = Boolean(options.isAllDisplay);
+    const safeTotalCaseCount = Math.max(0, Number(totalCaseCount || 0));
     const safeLimit = isAllDisplay
         ? variantItems.length
         : Math.max(0, Number(displayLimit) || 0);
@@ -1029,18 +1220,19 @@ function buildVariantCoveragePayload(variantItems, totalCaseCount, displayLimit 
     const displayLabel = isAllDisplay
         ? "全件カバー率"
         : `上位${Number(coveredItems.length || 0).toLocaleString("ja-JP")}件カバー率`;
-    const coveredCaseCount = coveredItems.reduce(
+    const coveredCaseCountRaw = coveredItems.reduce(
         (sum, variant) => sum + Number(variant.count || 0),
         0,
     );
+    const coveredCaseCount = Math.min(safeTotalCaseCount, Math.max(0, coveredCaseCountRaw));
 
     return {
         display_label: displayLabel,
         displayed_variant_count: coveredItems.length,
         covered_case_count: coveredCaseCount,
-        total_case_count: Number(totalCaseCount || 0),
-        ratio: totalCaseCount
-            ? coveredCaseCount / Number(totalCaseCount)
+        total_case_count: safeTotalCaseCount,
+        ratio: safeTotalCaseCount
+            ? coveredCaseCount / safeTotalCaseCount
             : 0,
     };
 }
@@ -1103,7 +1295,7 @@ function buildVariantSortLabel(sortKey) {
     case "ratio":
         return "比率順";
     case "avg_case_duration_sec":
-        return "平均所要時間順";
+        return "平均処理時間順";
     case "activity_count":
         return "アクティビティ数順";
     case "count":
@@ -1385,7 +1577,7 @@ function buildVariantDiffHtml(diffState, activeFocusId = "") {
     if (diffState.selectedIsBaseline) {
         return `
             <div class="variant-diff-summary">
-                <p class="panel-note">この Variant が比較基準です。全体で最も多い Variant を基準フローとして扱います。</p>
+                <p class="panel-note">このバリアントが比較基準です。全体で最も多いバリアントを基準フローとして扱います。</p>
             </div>
         `;
     }
@@ -1395,15 +1587,15 @@ function buildVariantDiffHtml(diffState, activeFocusId = "") {
             <p class="panel-note">Variant #${escapeHtml(diffState.baselineVariantId)} を基準に差分を比較しています。</p>
             <div class="variant-diff-grid">
                 <div class="variant-diff-group">
-                    <span class="variant-diff-label">追加 activity</span>
+                    <span class="variant-diff-label">追加アクティビティ</span>
                     <div class="variant-diff-badges">
-                        ${buildVariantDiffBadgeList(diffState.addedActivities, "variant-diff-badge--added", "追加 activity はありません。")}
+                        ${buildVariantDiffBadgeList(diffState.addedActivities, "variant-diff-badge--added", "追加アクティビティはありません。")}
                     </div>
                 </div>
                 <div class="variant-diff-group">
-                    <span class="variant-diff-label">スキップ activity</span>
+                    <span class="variant-diff-label">スキップしたアクティビティ</span>
                     <div class="variant-diff-badges">
-                        ${buildVariantDiffBadgeList(diffState.skippedActivities, "variant-diff-badge--skipped", "スキップ activity はありません。")}
+                        ${buildVariantDiffBadgeList(diffState.skippedActivities, "variant-diff-badge--skipped", "スキップしたアクティビティはありません。")}
                     </div>
                 </div>
                 <div class="variant-diff-group">
@@ -1437,7 +1629,7 @@ function buildFilterSelectionSummary(filters = {}, filterDefinitions = []) {
 
     if (normalizedFilters.activity_values.length) {
         appliedItems.push(
-            `Activity ${normalizedFilters.activity_mode === "exclude" ? "除外" : "含む"}: ${normalizedFilters.activity_values.join(", ")}`
+            `アクティビティ ${normalizedFilters.activity_mode === "exclude" ? "除外" : "含む"}: ${normalizedFilters.activity_values.join(", ")}`
         );
     }
 
@@ -1525,7 +1717,7 @@ function buildVariantSelectionState(variants, selectedVariantId) {
     if (selectedVariantId === null) {
         return {
             title: "全体表示中",
-            meta: "Pattern / Variant を選択すると、そのルートに属するケースだけでフロー図を再描画します。",
+            meta: "パターン / バリアントを選択すると、そのルートに属するケースだけでフロー図を再描画します。",
             sequence: "現在は全ケースを使ったフロー図を表示しています。",
             titleAttribute: "全ケースを使ったフロー図を表示しています。",
         };
@@ -1537,8 +1729,8 @@ function buildVariantSelectionState(variants, selectedVariantId) {
 
     if (!selectedVariant) {
         return {
-            title: "Pattern / Variant 情報なし",
-            meta: "選択中の Pattern / Variant 情報を取得できませんでした。",
+            title: "パターン / バリアント情報なし",
+            meta: "選択中のパターン / バリアント情報を取得できませんでした。",
             sequence: "",
             titleAttribute: "",
         };
@@ -1593,20 +1785,22 @@ function buildVariantCardsHtml(variants, selectedVariantId = null, emptyMessage 
             const routeLabel = patternNumber !== null
                 ? `Pattern #${patternNumber} / Variant #${variant.variant_id}`
                 : `Variant #${variant.variant_id}`;
+            const repeatFlag = String(variant.repeat_flag || "").trim();
             const cardTitle = [
                 `#${displayRank}`,
                 routeLabel,
+                `繰り返し ${repeatFlag || "なし"}`,
                 `${formatVariantRatio(variant.ratio)}% / ${caseCountText}件`,
-                `平均所要時間 ${variant.avg_case_duration_text || "0s"}`,
+                `平均処理時間 ${variant.avg_case_duration_text || "0s"}`,
                 sequenceText,
             ].join("\n");
 
             const patternCellHtml = detailHref
                 ? `<span class="variant-row-cell variant-row-cell--pattern">
-                        <span class="variant-row-cell-label">Pattern / Variant</span>
+                        <span class="variant-row-cell-label">パターン / バリアント</span>
                         <a href="${detailHref}" class="variant-row-cell-value variant-row-pattern-link" title="パターン詳細ページへ">${escapeHtml(routeLabel)}</a>
                     </span>`
-                : buildVariantRowCell("Pattern / Variant", routeLabel, "variant-row-cell--pattern");
+                : buildVariantRowCell("パターン / バリアント", routeLabel, "variant-row-cell--pattern");
 
             const sequenceCellHtml = `<span class="variant-row-cell variant-row-cell--sequence" title="${escapeHtml(sequenceText)}">
                     <span class="variant-row-cell-label">ルート</span>
@@ -1625,9 +1819,10 @@ function buildVariantCardsHtml(variants, selectedVariantId = null, emptyMessage 
                     >
                         ${buildVariantRowCell("順位", `#${displayRank}`, "variant-row-cell--rank")}
                         ${patternCellHtml}
+                        ${buildVariantRowCell("繰り返し", repeatFlag || "なし", "variant-row-cell--repeat")}
                         ${buildVariantRowCell("件数", `${caseCountText}件`, "variant-row-cell--count")}
                         ${buildVariantRowCell("比率", `${formatVariantRatio(variant.ratio)}%`, "variant-row-cell--ratio")}
-                        ${buildVariantRowCell("平均所要時間", variant.avg_case_duration_text || "0s", "variant-row-cell--duration")}
+                        ${buildVariantRowCell("平均処理時間", variant.avg_case_duration_text || "0s", "variant-row-cell--duration")}
                         ${sequenceCellHtml}
                     </div>
                 </article>
@@ -1638,7 +1833,7 @@ function buildVariantCardsHtml(variants, selectedVariantId = null, emptyMessage 
 
 function buildBottleneckCardsHtml(items, kind, selectionState = {}) {
     if (!Array.isArray(items) || !items.length) {
-        return '<p class="empty-state">No bottlenecks available.</p>';
+        return '<p class="empty-state">表示できるボトルネックがありません。</p>';
     }
 
     return items
@@ -1693,7 +1888,7 @@ function buildBottleneckCardsHtml(items, kind, selectionState = {}) {
 
 function buildCaseDrilldownTable(rows) {
     if (!Array.isArray(rows) || !rows.length) {
-        return '<p class="empty-state">No cases available.</p>';
+        return '<p class="empty-state">表示できるケースがありません。</p>';
     }
 
     const tableRows = rows.map((row) => ({
@@ -1713,12 +1908,12 @@ function buildCaseTraceSummaryHtml(caseId, summary) {
     }
 
     const summaryCards = [
-        { label: "Case ID", value: caseId },
+        { label: "ケースID", value: caseId },
         { label: "イベント数", value: Number(summary.event_count || 0).toLocaleString("ja-JP") },
         { label: "開始時刻", value: formatDateTime(summary.start_time) },
         { label: "終了時刻", value: formatDateTime(summary.end_time) },
-        { label: "総所要時間", value: summary.total_duration_text || "-" },
-        { label: "総所要時間(sec)", value: formatDurationSeconds(summary.total_duration_sec) },
+        { label: "総処理時間", value: summary.total_duration_text || "-" },
+        { label: "総処理時間(sec)", value: formatDurationSeconds(summary.total_duration_sec) },
     ];
 
     return `
@@ -1743,7 +1938,7 @@ function buildCaseTraceEventsTable(events) {
         "アクティビティ": eventRow.activity,
         "時刻": formatDateTime(eventRow.timestamp),
         "次アクティビティ": eventRow.next_activity || "完了",
-        "次イベントまでの待ち時間": eventRow.wait_to_next_text || "-",
+        "次イベントまでの所要時間": eventRow.wait_to_next_text || "-",
     }));
 
     return buildTable(eventRows);
@@ -1904,11 +2099,67 @@ function renderSummary(data, analysis) {
     `;
 }
 
+function compactPatternLabel(patternText = "") {
+    const steps = String(patternText || "")
+        .split(/\s*(?:→|->|⇒)\s*/u)
+        .map((step) => step.trim())
+        .filter(Boolean);
+
+    if (steps.length > 3) {
+        return `${steps.slice(0, 3).join(" → ")} → ...（全${steps.length}ステップ）`;
+    }
+
+    return String(patternText || "").trim() || "-";
+}
+
+function buildDetailTableRows(analysisKeyName, rows, rowOffset = 0) {
+    return (rows || []).map((row, index) => {
+        if (analysisKeyName === "frequency") {
+            return {
+                "アクティビティ名": row["アクティビティ"] ?? row["アクティビティ名"] ?? "-",
+                "イベント件数": row["イベント件数"] ?? "-",
+                "ケース数": row["ケース数"] ?? "-",
+                "平均処理時間(分)": row["平均処理時間(分)"] ?? row["平均時間(分)"] ?? "-",
+                "75%ile(分)": row["75%点(分)"] ?? "-",
+                "イベント占有率(%)": row["イベント占有率(%)"] ?? row["event_ratio_pct"] ?? "-",
+                __rowIndex: rowOffset + index,
+            };
+        }
+
+        if (analysisKeyName === "transition") {
+            return {
+                "遷移名": row["遷移名"] ?? [row["前処理アクティビティ名"], row["後処理アクティビティ名"]].filter(Boolean).join(" → "),
+                "ケース数": row["ケース数"] ?? row["遷移件数"] ?? "-",
+                "平均所要時間(分)": row["平均所要時間(分)"] ?? row["平均時間(分)"] ?? row["平均待ち時間(分)"] ?? "-",
+                "中央値処理時間(分)": row["中央値所要時間(分)"] ?? row["中央値時間(分)"] ?? "-",
+                "最大処理時間(分)": row["最大所要時間(分)"] ?? row["最大時間(分)"] ?? "-",
+                "割合(%)": row["割合(%)"] ?? row["遷移比率(%)"] ?? "-",
+                __rowIndex: rowOffset + index,
+            };
+        }
+
+        if (analysisKeyName === "pattern") {
+            const patternText = row["パターン"] ?? row["処理順パターン"] ?? row["パターン / バリアント"] ?? "";
+            return {
+                "パターン": compactPatternLabel(patternText),
+                "ケース数": row["ケース数"] ?? "-",
+                "比率(%)": row["比率(%)"] ?? row["ケース比率(%)"] ?? "-",
+                "平均ケース処理時間(分)": row["平均ケース処理時間(分)"] ?? row["平均処理時間(分)"] ?? "-",
+                "繰り返し": row["繰り返し"] ?? "-",
+                "改善優先度": row["改善優先度スコア"] ?? "-",
+                __rowIndex: rowOffset + index,
+            };
+        }
+
+        return { ...row, __rowIndex: rowOffset + index };
+    });
+}
+
 function renderResult(analysis, runId = "", onPageChange = null) {
     const rowOffset = Number(analysis.row_offset || 0);
     const rowCount = analysis.row_count ?? analysis.rows.length;
     const returnedRowCount = analysis.returned_row_count ?? analysis.rows.length;
-    const tableRows = analysis.rows.map((row, index) => ({ ...row, __rowIndex: rowOffset + index }));
+    const tableRows = buildDetailTableRows(analysisKey, analysis.rows, rowOffset);
     const resultMeta = returnedRowCount < rowCount
         ? `全 ${escapeHtml(rowCount)} 件中、先頭 ${escapeHtml(returnedRowCount)} 件を表示`
         : `全 ${escapeHtml(rowCount)} 件を表示`;
@@ -2137,8 +2388,70 @@ function optimizeLayerBySwaps(layerNodes, edges, nodeLookup) {
     }
 }
 
+function buildChartLimitButtons(activeLimit, supportedLimits) {
+    return supportedLimits.map((limit) => `
+        <button
+            type="button"
+            class="btn btn-secondary btn-sm detail-chart-limit${String(activeLimit) === String(limit.value) ? " is-active" : ""}"
+            data-chart-limit="${escapeHtml(limit.value)}"
+        >
+            ${escapeHtml(limit.label)}
+        </button>
+    `).join("");
+}
+
+function buildDonutChartMarkup(segments, total, centerTitle, centerValue) {
+    const normalizedSegments = segments
+        .map((segment) => ({
+            ...segment,
+            ratio: Math.max(0, Number(segment.ratio || 0)),
+        }))
+        .filter((segment) => segment.ratio > 0);
+    const totalRatio = normalizedSegments.reduce((sum, segment) => sum + segment.ratio, 0);
+    let currentAngle = 0;
+    const gradientStops = [];
+
+    normalizedSegments.forEach((segment) => {
+        const normalizedRatio = totalRatio > 0 ? segment.ratio / totalRatio : 0;
+        const startAngle = currentAngle;
+        const endAngle = currentAngle + normalizedRatio * 360;
+        gradientStops.push(`${segment.color} ${startAngle.toFixed(2)}deg ${endAngle.toFixed(2)}deg`);
+        currentAngle = endAngle;
+    });
+
+    const gradient = gradientStops.length
+        ? `conic-gradient(${gradientStops.join(", ")})`
+        : "conic-gradient(#e2e8f0 0deg 360deg)";
+
+    return `
+        <div class="detail-pie-card">
+            <div class="detail-pie-chart" role="img" aria-label="${escapeHtml(centerTitle)}" style="background:${escapeHtml(gradient)}">
+                <div class="detail-pie-hole">
+                    <span class="detail-pie-center-label">${escapeHtml(centerTitle)}</span>
+                    <strong class="detail-pie-center-value">${escapeHtml(centerValue)}</strong>
+                    <small class="detail-pie-center-meta">全 ${escapeHtml(Number(total || 0).toLocaleString("ja-JP"))} 件</small>
+                </div>
+            </div>
+            <div class="detail-pie-legend">
+                ${normalizedSegments.map((segment) => {
+                    const normalizedRatio = totalRatio > 0 ? segment.ratio / totalRatio : 0;
+                    return `
+                        <div class="detail-pie-legend-item" title="${escapeHtml(segment.tooltip || "")}">
+                            <span class="detail-pie-dot" style="background:${escapeHtml(segment.color)}"></span>
+                            <span class="detail-pie-legend-label">${escapeHtml(segment.label)}</span>
+                            <span class="detail-pie-legend-value">${escapeHtml((normalizedRatio * 100).toFixed(1))}%</span>
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+        </div>
+    `;
+}
+
 function renderFrequencyChart(analysis) {
-    const chartRows = analysis.rows.slice(0, 15);
+    const allRows = Array.isArray(analysis.rows) ? analysis.rows : [];
+    const visibleLimit = frequencyChartLimit === "all" ? allRows.length : Math.min(allRows.length, Number(frequencyChartLimit) || 10);
+    const chartRows = allRows.slice(0, visibleLimit);
 
     if (!chartRows.length) {
         chartPanel.className = "result-panel";
@@ -2149,80 +2462,134 @@ function renderFrequencyChart(analysis) {
     }
 
     const maxEventCount = Math.max(...chartRows.map((row) => Number(row["イベント件数"]) || 0), 1);
-    const chartWidth = 1400;
-    const labelWidth = 210;
-    const barAreaWidth = 860;
-    const infoWidth = 220;
-    const chartLeft = 18;
-    const barStartX = chartLeft + labelWidth + 12;
-    const infoStartX = barStartX + barAreaWidth + 20;
-    const chartHeight = 92 + chartRows.length * 44;
+    const chartWidth = 1020;
+    const labelWidth = 240;
+    const barAreaWidth = 560;
+    const chartLeft = 14;
+    const barStartX = chartLeft + labelWidth + 16;
+    const valueX = barStartX + barAreaWidth + 24;
+    const rowHeight = 48;
+    const chartHeight = 80 + chartRows.length * rowHeight;
     const scaleValues = [0, 0.25, 0.5, 0.75, 1];
 
-    const gridLines = scaleValues
-        .map((rate) => {
-            const x = barStartX + barAreaWidth * rate;
-            return `
-                <line x1="${x}" y1="42" x2="${x}" y2="${chartHeight - 16}" class="frequency-svg-grid"></line>
-                <text x="${x}" y="26" text-anchor="${rate === 0 ? "start" : rate === 1 ? "end" : "middle"}" class="frequency-svg-scale">
-                    ${escapeHtml(Math.round(maxEventCount * rate).toLocaleString("ja-JP"))}
-                </text>
-            `;
-        })
-        .join("");
+    const gridLines = scaleValues.map((rate) => {
+        const x = barStartX + barAreaWidth * rate;
+        return `
+            <line x1="${x}" y1="36" x2="${x}" y2="${chartHeight - 16}" class="frequency-svg-grid"></line>
+            <text x="${x}" y="20" text-anchor="${rate === 0 ? "start" : rate === 1 ? "end" : "middle"}" class="frequency-svg-scale">
+                ${escapeHtml(Math.round(maxEventCount * rate).toLocaleString("ja-JP"))}
+            </text>
+        `;
+    }).join("");
 
-    const rowsSvg = chartRows
-        .map((row, index) => {
-            const activityName = row["アクティビティ"];
-            const eventCount = Number(row["イベント件数"]) || 0;
-            const averageDuration = row["平均時間(分)"];
-            const barWidth = Math.max(12, (eventCount / maxEventCount) * barAreaWidth);
-            const rowCenterY = 62 + index * 44;
-            const labelLines = wrapJapaneseLabel(activityName);
-            const labelSvg = labelLines
-                .map((line, lineIndex) => {
-                    const lineOffset = labelLines.length === 1 ? 0 : lineIndex === 0 ? -8 : 10;
-                    return `
-                        <text x="${chartLeft}" y="${rowCenterY + lineOffset}" class="frequency-svg-label">
-                            ${escapeHtml(line)}
-                        </text>
-                    `;
-                })
-                .join("");
+    const topFiveRows = [...allRows]
+        .sort((a, b) => (Number(b["イベント件数"]) || 0) - (Number(a["イベント件数"]) || 0))
+        .slice(0, 5);
+    const topFiveTotal = topFiveRows.reduce((sum, row) => sum + (Number(row["イベント件数"]) || 0), 0);
+    const otherCount = Math.max(0, (allRows.reduce((sum, row) => sum + (Number(row["イベント件数"]) || 0), 0) - topFiveTotal));
+    const donutPalette = ["#1e40af", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"];
+    const donutSegments = [
+        ...topFiveRows.map((row, index) => ({
+            label: String(row["アクティビティ"] || `Top${index + 1}`),
+            ratio: (Number(row["イベント件数"]) || 0) / Math.max(1, topFiveTotal + otherCount),
+            color: donutPalette[index] || "#bfdbfe",
+            tooltip: `${row["アクティビティ"]}: ${Number(row["イベント件数"] || 0).toLocaleString("ja-JP")} 件`,
+        })),
+        ...(otherCount > 0 ? [{
+            label: "その他",
+            ratio: otherCount / Math.max(1, topFiveTotal + otherCount),
+            color: "#e2e8f0",
+            tooltip: `その他: ${otherCount.toLocaleString("ja-JP")} 件`,
+        }] : []),
+    ];
 
-            return `
-                ${labelSvg}
-                <rect x="${barStartX}" y="${rowCenterY - 10}" width="${barAreaWidth}" height="20" rx="10" ry="10" class="frequency-svg-track"></rect>
-                <rect x="${barStartX}" y="${rowCenterY - 10}" width="${barWidth}" height="20" rx="10" ry="10" class="frequency-svg-bar"></rect>
-                <text x="${infoStartX}" y="${rowCenterY - 2}" class="frequency-svg-count">
-                    ${escapeHtml(eventCount.toLocaleString("ja-JP"))}件
-                </text>
-                <text x="${infoStartX}" y="${rowCenterY + 14}" class="frequency-svg-avg">
-                    平均${escapeHtml(String(averageDuration))}分
-                </text>
-            `;
-        })
-        .join("");
+    const rowsSvg = chartRows.map((row, index) => {
+        const activityName = String(row["アクティビティ"] || "").trim();
+        const eventCount = Number(row["イベント件数"]) || 0;
+        const averageDuration = row["平均処理時間(分)"] ?? row["平均時間(分)"] ?? "-";
+        const medianDuration = row["中央値処理時間(分)"] ?? row["中央値時間(分)"] ?? "-";
+        const ratio = row["イベント占有率(%)"] ?? row["event_ratio_pct"] ?? "-";
+        const barWidth = Math.max(12, (eventCount / maxEventCount) * barAreaWidth);
+        const rowCenterY = 54 + index * rowHeight;
+        const labelLines = wrapJapaneseLabel(activityName, 14);
+        const fillColor = index === 0
+            ? "#2563eb"
+            : index < 3
+                ? "#3b82f6"
+                : `rgba(59, 130, 246, ${Math.max(0.28, 0.84 - index * 0.06)})`;
+
+        return `
+            <g class="detail-chart-bar-group">
+                <title>${escapeHtml(`${activityName} / 件数 ${eventCount.toLocaleString("ja-JP")} / 平均 ${averageDuration}分 / 中央値 ${medianDuration}分 / 占有率 ${ratio}%`)}</title>
+                ${labelLines.map((line, lineIndex) => `
+                    <text x="${chartLeft}" y="${rowCenterY + (lineIndex === 0 ? -4 : 12)}" class="frequency-svg-label">${escapeHtml(line)}</text>
+                `).join("")}
+                <rect x="${barStartX}" y="${rowCenterY - 10}" width="${barAreaWidth}" height="18" rx="9" ry="9" class="frequency-svg-track"></rect>
+                <rect x="${barStartX}" y="${rowCenterY - 10}" width="${barWidth}" height="18" rx="9" ry="9" fill="${fillColor}"></rect>
+                <text x="${valueX}" y="${rowCenterY + 4}" class="frequency-svg-count">${escapeHtml(eventCount.toLocaleString("ja-JP"))}件</text>
+            </g>
+        `;
+    }).join("");
 
     chartPanel.className = "result-panel";
-    chartTitle.textContent = "頻度分析グラフ";
-    chartNote.textContent = "左がアクティビティ名、中央の棒がイベント件数、右が件数と平均時間(分)です。";
+    chartTitle.textContent = "頻度分析";
+    chartNote.textContent = "件数を軸に比較し、詳細な時間情報はホバーで確認できます。";
     chartContainer.innerHTML = `
-        <svg
-            class="frequency-chart-svg"
-            viewBox="0 0 ${chartWidth} ${chartHeight}"
-            role="img"
-            aria-label="頻度分析グラフ"
-            preserveAspectRatio="xMinYMin meet"
-        >
-            ${gridLines}
-            ${rowsSvg}
-        </svg>
+        <div class="detail-chart-toolbar">
+            <div class="detail-chart-toolbar-copy">
+                <strong>アクティビティ頻度</strong>
+                <span>Top10 を初期表示し、イベント占有率は右のドーナツで確認できます。</span>
+            </div>
+            <div class="detail-chart-toolbar-actions">
+                ${buildChartLimitButtons(frequencyChartLimit, [
+                    { value: 10, label: "Top10" },
+                    { value: 20, label: "Top20" },
+                    { value: "all", label: "全件" },
+                ])}
+            </div>
+        </div>
+        <div class="detail-chart-split">
+            <div class="detail-chart-main">
+                <svg class="frequency-chart-svg" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="頻度分析グラフ" preserveAspectRatio="xMinYMin meet">
+                    ${gridLines}
+                    ${rowsSvg}
+                </svg>
+            </div>
+            ${buildDonutChartMarkup(
+                donutSegments,
+                topFiveTotal + otherCount,
+                "上位5件占有率",
+                `${Math.round((topFiveTotal / Math.max(1, topFiveTotal + otherCount)) * 100)}%`,
+            )}
+        </div>
     `;
+
+    chartContainer.querySelectorAll("[data-chart-limit]").forEach((buttonElement) => {
+        buttonElement.addEventListener("click", () => {
+            frequencyChartLimit = buttonElement.dataset.chartLimit === "all"
+                ? "all"
+                : Number(buttonElement.dataset.chartLimit || 10);
+            renderFrequencyChart(analysis);
+        });
+    });
 }
 
+let transitionDirectionFilter = "all";
+
 function renderTransitionChart(analysis) {
-    const chartRows = analysis.rows.slice(0, 15);
+    const allRows = Array.isArray(analysis.rows) ? analysis.rows : [];
+
+    const reverseLookupFull = new Set(
+        allRows.map((row) => `${row["前処理アクティビティ名"]}|||${row["後処理アクティビティ名"]}`)
+    );
+    const filteredRows = transitionDirectionFilter === "forward"
+        ? allRows.filter((row) => !reverseLookupFull.has(`${row["後処理アクティビティ名"]}|||${row["前処理アクティビティ名"]}`))
+        : transitionDirectionFilter === "reverse"
+            ? allRows.filter((row) => reverseLookupFull.has(`${row["後処理アクティビティ名"]}|||${row["前処理アクティビティ名"]}`))
+            : allRows;
+
+    const visibleLimit = transitionChartLimit === "all" ? filteredRows.length : Math.min(filteredRows.length, Number(transitionChartLimit) || 15);
+    const chartRows = filteredRows.slice(0, visibleLimit);
 
     if (!chartRows.length) {
         chartPanel.className = "result-panel";
@@ -2232,70 +2599,131 @@ function renderTransitionChart(analysis) {
         return;
     }
 
-    const maxTransitionCount = Math.max(...chartRows.map((row) => Number(row["遷移件数"]) || 0), 1);
-    const chartWidth = 1400;
-    const labelWidth = 250;
-    const barAreaWidth = 820;
-    const chartLeft = 18;
-    const barStartX = chartLeft + labelWidth + 12;
-    const infoStartX = barStartX + barAreaWidth + 20;
-    const chartHeight = 92 + chartRows.length * 52;
+    const reverseLookup = reverseLookupFull;
+    const maxTransitionCount = Math.max(...chartRows.map((row) => Number(row["遷移件数"]) || Number(row["ケース数"]) || 0), 1);
+    const chartWidth = 1080;
+    const labelWidth = 300;
+    const barAreaWidth = 540;
+    const chartLeft = 14;
+    const barStartX = chartLeft + labelWidth + 16;
+    const valueX = barStartX + barAreaWidth + 24;
+    const rowHeight = 54;
+    const chartHeight = 84 + chartRows.length * rowHeight;
     const scaleValues = [0, 0.25, 0.5, 0.75, 1];
 
-    const gridLines = scaleValues
-        .map((rate) => {
-            const x = barStartX + barAreaWidth * rate;
-            return `
-                <line x1="${x}" y1="42" x2="${x}" y2="${chartHeight - 16}" class="transition-svg-grid"></line>
-                <text x="${x}" y="26" text-anchor="${rate === 0 ? "start" : rate === 1 ? "end" : "middle"}" class="transition-svg-scale">
-                    ${escapeHtml(Math.round(maxTransitionCount * rate).toLocaleString("ja-JP"))}
-                </text>
-            `;
-        })
-        .join("");
+    const gridLines = scaleValues.map((rate) => {
+        const x = barStartX + barAreaWidth * rate;
+        return `
+            <line x1="${x}" y1="36" x2="${x}" y2="${chartHeight - 16}" class="transition-svg-grid"></line>
+            <text x="${x}" y="20" text-anchor="${rate === 0 ? "start" : rate === 1 ? "end" : "middle"}" class="transition-svg-scale">
+                ${escapeHtml(Math.round(maxTransitionCount * rate).toLocaleString("ja-JP"))}
+            </text>
+        `;
+    }).join("");
 
-    const rowsSvg = chartRows
-        .map((row, index) => {
-            const fromActivity = row["前処理アクティビティ名"];
-            const toActivity = row["後処理アクティビティ名"];
-            const transitionLabel = `${fromActivity} → ${toActivity}`;
-            const transitionCount = Number(row["遷移件数"]) || 0;
-            const avgDuration = row["平均時間(分)"] ?? row["平均所要時間(分)"] ?? row["平均待ち時間(分)"];
-            const transitionRatio = row["遷移比率(%)"];
-            const barWidth = Math.max(12, (transitionCount / maxTransitionCount) * barAreaWidth);
-            const rowCenterY = 68 + index * 52;
+    const topFiveRows = [...allRows]
+        .sort((a, b) => ((Number(b["遷移件数"]) || Number(b["ケース数"]) || 0) - (Number(a["遷移件数"]) || Number(a["ケース数"]) || 0)))
+        .slice(0, 5);
+    const topFiveTotal = topFiveRows.reduce((sum, row) => sum + (Number(row["遷移件数"]) || Number(row["ケース数"]) || 0), 0);
+    const allTotal = allRows.reduce((sum, row) => sum + (Number(row["遷移件数"]) || Number(row["ケース数"]) || 0), 0);
+    const otherCount = Math.max(0, allTotal - topFiveTotal);
+    const transitionDonutPalette = ["#2563eb", "#3b82f6", "#10b981", "#f59e0b", "#94a3b8"];
+    const donutSegments = [
+        ...topFiveRows.map((row, index) => ({
+            label: `${row["前処理アクティビティ名"]} → ${row["後処理アクティビティ名"]}`,
+            ratio: (Number(row["遷移件数"]) || Number(row["ケース数"]) || 0) / Math.max(1, allTotal),
+            color: transitionDonutPalette[index] || "#e2e8f0",
+            tooltip: `${row["前処理アクティビティ名"]} → ${row["後処理アクティビティ名"]}: ${Number(row["遷移件数"] || row["ケース数"] || 0).toLocaleString("ja-JP")} 件`,
+        })),
+        ...(otherCount > 0 ? [{
+            label: "その他",
+            ratio: otherCount / Math.max(1, allTotal),
+            color: "#e2e8f0",
+            tooltip: `その他: ${otherCount.toLocaleString("ja-JP")} 件`,
+        }] : []),
+    ];
 
-            return `
-                <text x="${chartLeft}" y="${rowCenterY + 4}" class="transition-svg-label">
-                    ${escapeHtml(transitionLabel)}
-                </text>
-                <rect x="${barStartX}" y="${rowCenterY - 10}" width="${barAreaWidth}" height="20" rx="10" ry="10" class="transition-svg-track"></rect>
-                <rect x="${barStartX}" y="${rowCenterY - 10}" width="${barWidth}" height="20" rx="10" ry="10" class="transition-svg-bar"></rect>
-                <text x="${infoStartX}" y="${rowCenterY - 2}" class="transition-svg-count">
-                    ${escapeHtml(transitionCount.toLocaleString("ja-JP"))}件 (${escapeHtml(String(transitionRatio))}%)
-                </text>
-                <text x="${infoStartX}" y="${rowCenterY + 14}" class="transition-svg-avg">
-                    平均所要${escapeHtml(String(avgDuration ?? "-"))}分
-                </text>
-            `;
-        })
-        .join("");
+    const rowsSvg = chartRows.map((row) => {
+        const fromActivity = String(row["前処理アクティビティ名"] || "").trim();
+        const toActivity = String(row["後処理アクティビティ名"] || "").trim();
+        const transitionLabel = `${fromActivity} → ${toActivity}`;
+        const transitionCount = Number(row["遷移件数"]) || Number(row["ケース数"]) || 0;
+        const avgDuration = row["平均所要時間(分)"] ?? row["平均時間(分)"] ?? row["平均待ち時間(分)"] ?? "-";
+        const medianDuration = row["中央値所要時間(分)"] ?? row["中央値時間(分)"] ?? "-";
+        const maxDuration = row["最大所要時間(分)"] ?? row["最大時間(分)"] ?? "-";
+        const transitionRatio = row["遷移比率(%)"] ?? row["割合(%)"] ?? "-";
+        const isReverse = reverseLookup.has(`${toActivity}|||${fromActivity}`);
+        const barWidth = Math.max(12, (transitionCount / maxTransitionCount) * barAreaWidth);
+        const rowCenterY = 56 + chartRows.indexOf(row) * rowHeight;
+        const fillColor = isReverse ? "#ef4444" : chartRows.indexOf(row) < 3 ? "#3b82f6" : "#93c5fd";
+
+        return `
+            <g class="detail-chart-bar-group">
+                <title>${escapeHtml(`${transitionLabel} / 件数 ${transitionCount.toLocaleString("ja-JP")} / 平均 ${avgDuration}分 / 中央値 ${medianDuration}分 / 最大 ${maxDuration}分 / 比率 ${transitionRatio}%`)}</title>
+                <text x="${chartLeft}" y="${rowCenterY + 4}" class="transition-svg-label">${escapeHtml(transitionLabel)}</text>
+                <rect x="${barStartX}" y="${rowCenterY - 10}" width="${barAreaWidth}" height="18" rx="9" ry="9" class="transition-svg-track"></rect>
+                <rect x="${barStartX}" y="${rowCenterY - 10}" width="${barWidth}" height="18" rx="9" ry="9" fill="${fillColor}"></rect>
+                <text x="${valueX}" y="${rowCenterY + 4}" class="transition-svg-count">${escapeHtml(transitionCount.toLocaleString("ja-JP"))}件</text>
+            </g>
+        `;
+    }).join("");
 
     chartPanel.className = "result-panel";
-    chartTitle.textContent = "前後処理分析グラフ";
-    chartNote.textContent = "左が前処理→後処理、中央の棒が遷移件数、右が件数比率と平均所要時間(分)です。";
+    chartTitle.textContent = "前後処理分析";
+    chartNote.textContent = "遷移件数を中心に比較し、逆方向遷移は赤で強調しています。";
     chartContainer.innerHTML = `
-        <svg
-            class="transition-chart-svg"
-            viewBox="0 0 ${chartWidth} ${chartHeight}"
-            role="img"
-            aria-label="前後処理分析グラフ"
-            preserveAspectRatio="xMinYMin meet"
-        >
-            ${gridLines}
-            ${rowsSvg}
-        </svg>
+        <div class="detail-chart-toolbar">
+            <div class="detail-chart-toolbar-copy">
+                <strong>遷移頻度</strong>
+                <span>詳細な処理時間はホバーで確認できます。</span>
+            </div>
+            <div class="detail-chart-toolbar-actions">
+                <div class="chart-limit-buttons">
+                    ${["all", "forward", "reverse"].map((dir) => `
+                        <button type="button" class="btn btn-sm${transitionDirectionFilter === dir ? " active" : ""}" data-transition-dir="${dir}">
+                            ${{ all: "全遷移", forward: "順方向", reverse: "逆方向" }[dir]}
+                        </button>
+                    `).join("")}
+                </div>
+                ${buildChartLimitButtons(transitionChartLimit, [
+                    { value: 10, label: "Top10" },
+                    { value: 15, label: "Top15" },
+                    { value: 20, label: "Top20" },
+                    { value: "all", label: "全件" },
+                ])}
+            </div>
+        </div>
+        <div class="detail-chart-split">
+            <div class="detail-chart-main">
+                <svg class="transition-chart-svg" viewBox="0 0 ${chartWidth} ${chartHeight}" role="img" aria-label="前後処理分析グラフ" preserveAspectRatio="xMinYMin meet">
+                    ${gridLines}
+                    ${rowsSvg}
+                </svg>
+            </div>
+            ${buildDonutChartMarkup(
+                donutSegments,
+                allTotal,
+                "上位5遷移占有率",
+                `${Math.round((topFiveTotal / Math.max(1, allTotal)) * 100)}%`,
+            )}
+        </div>
     `;
+
+    chartContainer.querySelectorAll("[data-chart-limit]").forEach((buttonElement) => {
+        buttonElement.addEventListener("click", () => {
+            transitionChartLimit = buttonElement.dataset.chartLimit === "all"
+                ? "all"
+                : Number(buttonElement.dataset.chartLimit || 15);
+            renderTransitionChart(analysis);
+        });
+    });
+
+    chartContainer.querySelectorAll("[data-transition-dir]").forEach((buttonElement) => {
+        buttonElement.addEventListener("click", () => {
+            transitionDirectionFilter = buttonElement.dataset.transitionDir || "all";
+            renderTransitionChart(analysis);
+        });
+    });
 }
 
 function buildProcessFlowData(patternRows, transitionRows = [], frequencyRows = []) {
@@ -2333,11 +2761,11 @@ function buildProcessFlowData(patternRows, transitionRows = [], frequencyRows = 
         node.caseWeight = Math.max(node.caseWeight, Number(row["ケース数"]) || 0);
 
         // Extract duration metrics for tooltips
-        if (row["平均時間(分)"] !== undefined) {
-            node.avgDuration = Number(row["平均時間(分)"]) || 0;
+        if (row["平均処理時間(分)"] !== undefined || row["平均時間(分)"] !== undefined) {
+            node.avgDuration = Number(row["平均処理時間(分)"] ?? row["平均時間(分)"]) || 0;
         }
-        if (row["最大時間(分)"] !== undefined) {
-            node.maxDuration = Number(row["最大時間(分)"]) || 0;
+        if (row["最大処理時間(分)"] !== undefined || row["最大時間(分)"] !== undefined) {
+            node.maxDuration = Number(row["最大処理時間(分)"] ?? row["最大時間(分)"]) || 0;
         }
     });
 
@@ -2978,6 +3406,64 @@ function calculateProcessFlowLayout(nodes, edges, options = {}) {
     };
 }
 
+function getProcessMapBezierPoint(p0, p1, p2, p3, t) {
+    const mt = 1 - t;
+    return {
+        x: (mt ** 3 * p0.x)
+            + (3 * mt * mt * t * p1.x)
+            + (3 * mt * t * t * p2.x)
+            + (t ** 3 * p3.x),
+        y: (mt ** 3 * p0.y)
+            + (3 * mt * mt * t * p1.y)
+            + (3 * mt * t * t * p2.y)
+            + (t ** 3 * p3.y),
+    };
+}
+
+function getProcessMapBezierTangent(p0, p1, p2, p3, t) {
+    const mt = 1 - t;
+    return {
+        x: (3 * mt * mt * (p1.x - p0.x))
+            + (6 * mt * t * (p2.x - p1.x))
+            + (3 * t * t * (p3.x - p2.x)),
+        y: (3 * mt * mt * (p1.y - p0.y))
+            + (6 * mt * t * (p2.y - p1.y))
+            + (3 * t * t * (p3.y - p2.y)),
+    };
+}
+
+function getProcessMapCurveLabelPosition(p0, p1, p2, p3, options = {}) {
+    const anchorT = Number.isFinite(options.t) ? options.t : 0.5;
+    const offset = Number.isFinite(options.offset) ? options.offset : 16;
+    const preferredDirectionX = Number(options.preferredDirectionX || 0);
+    const preferredDirectionY = Number(options.preferredDirectionY || 0);
+    const anchorPoint = getProcessMapBezierPoint(p0, p1, p2, p3, anchorT);
+    const tangent = getProcessMapBezierTangent(p0, p1, p2, p3, anchorT);
+    const tangentLength = Math.hypot(tangent.x, tangent.y) || 1;
+    let normalX = -tangent.y / tangentLength;
+    let normalY = tangent.x / tangentLength;
+
+    if (preferredDirectionX && (normalX * preferredDirectionX) < 0) {
+        normalX *= -1;
+        normalY *= -1;
+    } else if (!preferredDirectionX && preferredDirectionY && (normalY * preferredDirectionY) < 0) {
+        normalX *= -1;
+        normalY *= -1;
+    }
+
+    return {
+        x: anchorPoint.x + (normalX * offset),
+        y: anchorPoint.y + (normalY * offset),
+    };
+}
+
+function clampProcessMapLabelPosition(x, y, chartWidth, chartHeight, paddingX = 24, paddingY = 16) {
+    return {
+        x: Math.max(paddingX, Math.min(chartWidth - paddingX, x)),
+        y: Math.max(paddingY, Math.min(chartHeight - paddingY, y)),
+    };
+}
+
 function renderProcessFlowMapFromData(flowData, options = {}) {
     const activityPercent = Number(options.activityPercent ?? 100);
     const connectionPercent = Number(options.connectionPercent ?? 100);
@@ -3059,11 +3545,27 @@ function renderProcessFlowMapFromData(flowData, options = {}) {
         let pathD = "", lblX = 0, lblY = 0;
 
         if (!isBack) {
-            if (isSpine) { pathD = `M ${startX} ${startY} L ${endX} ${endY}`; lblX = (startX + endX) / 2 + 10; lblY = (startY + endY) / 2; }
+            if (isSpine) {
+                pathD = `M ${startX} ${startY} L ${endX} ${endY}`;
+                lblX = ((startX + endX) / 2) + 18;
+                lblY = (startY + endY) / 2;
+            }
             else {
                 const off = Math.max(120, (endY - startY) * 0.5);
                 pathD = `M ${startX} ${startY} C ${startX} ${startY + off}, ${endX} ${endY - off}, ${endX} ${endY}`;
-                lblX = (startX + endX) / 2 + 5; lblY = (startY + endY) / 2;
+                const labelPoint = getProcessMapCurveLabelPosition(
+                    { x: startX, y: startY },
+                    { x: startX, y: startY + off },
+                    { x: endX, y: endY - off },
+                    { x: endX, y: endY },
+                    {
+                        t: 0.52,
+                        offset: 16,
+                        preferredDirectionX: endX >= startX ? 1 : -1,
+                    }
+                );
+                lblX = labelPoint.x;
+                lblY = labelPoint.y;
             }
         } else {
             const rY = Math.max(startY, endY)
@@ -3071,8 +3573,24 @@ function renderProcessFlowMapFromData(flowData, options = {}) {
                 + Math.abs(t.layer - s.layer) * returnRouteLayerOffset;
             const rXOff = s.x >= mainSpineX ? 220 + layerGap : -(220 + layerGap); 
             pathD = `M ${startX} ${startY} C ${startX} ${rY}, ${endX + rXOff} ${rY}, ${endX} ${endY}`;
-            lblX = endX + rXOff / 2; lblY = rY - 10;
+            const labelPoint = getProcessMapCurveLabelPosition(
+                { x: startX, y: startY },
+                { x: startX, y: rY },
+                { x: endX + rXOff, y: rY },
+                { x: endX, y: endY },
+                {
+                    t: 0.36,
+                    offset: 18,
+                    preferredDirectionX: Math.sign(rXOff) || (s.x >= mainSpineX ? 1 : -1),
+                }
+            );
+            lblX = labelPoint.x;
+            lblY = labelPoint.y;
         }
+
+        const clampedLabelPosition = clampProcessMapLabelPosition(lblX, lblY, chartWidth, chartHeight);
+        lblX = clampedLabelPosition.x;
+        lblY = clampedLabelPosition.y;
 
         const showLabel = labelState.visibleLabelKeys.has(getProcessFlowEdgeKey(edge));
         const transitionKey = buildTransitionKey(edge.source, edge.target);
@@ -3091,7 +3609,7 @@ function renderProcessFlowMapFromData(flowData, options = {}) {
             : "var(--edge-heat-filter, none)";
         return `
             <path d="${pathD}" class="${isBack ? "process-map-edge process-map-edge--return" : "process-map-edge"}" marker-end="url(#${isBack ? "process-map-arrow-return" : "process-map-arrow"})" data-source="${escapeHtml(edge.source)}" data-target="${escapeHtml(edge.target)}" data-transition-key="${escapeHtml(transitionKey)}" style="stroke-width: ${strokeWidth}; opacity: ${opacity}; fill: none; stroke: var(--edge-heat-stroke, ${strokeColor}); filter: ${edgeFilter};"></path>
-            ${showLabel ? `<text x="${lblX}" y="${lblY}" class="${isBack ? "process-map-edge-label process-map-edge-label--return" : "process-map-edge-label"}" data-source="${escapeHtml(edge.source)}" data-target="${escapeHtml(edge.target)}" data-transition-key="${escapeHtml(transitionKey)}" data-label-count="${escapeHtml(getProcessMapEdgeLabelText(edge, "count"))}" data-label-duration="${escapeHtml(getProcessMapEdgeLabelText(edge, "duration"))}" data-label-mode="${escapeHtml(labelMode)}">${escapeHtml(getProcessMapEdgeLabelText(edge, labelMode))}</text>` : ""}
+            ${showLabel ? `<text x="${lblX}" y="${lblY}" class="${isBack ? "process-map-edge-label process-map-edge-label--return" : "process-map-edge-label"}" data-source="${escapeHtml(edge.source)}" data-target="${escapeHtml(edge.target)}" data-transition-key="${escapeHtml(transitionKey)}" data-label-count="${escapeHtml(getProcessMapEdgeLabelText(edge, "count"))}" data-label-duration="${escapeHtml(getProcessMapEdgeLabelText(edge, "duration"))}" data-label-mode="${escapeHtml(labelMode)}" dominant-baseline="middle" alignment-baseline="middle">${escapeHtml(getProcessMapEdgeLabelText(edge, labelMode))}</text>` : ""}
         `;
     }).join("");
 
@@ -3193,13 +3711,13 @@ function renderProcessHeatLegend() {
     const legendLevels = ["heat-1", "heat-2", "heat-3", "heat-4", "heat-5"];
 
     return `
-        <section class="process-explorer-legend" aria-label="Heatmap legend">
+        <section class="process-explorer-legend" aria-label="ヒートマップ凡例">
             <div class="process-explorer-control-head">
-                <span>Heatmap</span>
-                <strong>Avg wait</strong>
+                <span>ヒートマップ</span>
+                <strong>平均所要時間</strong>
             </div>
             <div class="process-explorer-legend-body">
-                <p class="process-explorer-legend-copy">平均所要時間ベースの Heatmap です。ノードは activity、線は transition の所要時間を表します。</p>
+                <p class="process-explorer-legend-copy">遷移ごとの平均所要時間を色で示します。線 (遷移) は次のステップまでの所要時間、ノード (アクティビティ) はそこを経由する遷移の所要時間を反映します。赤いほど所要時間が長い箇所です。</p>
                 <div class="process-explorer-legend-scale">
                     <span class="process-explorer-legend-boundary">HIGH</span>
                     <div class="process-explorer-legend-swatches">
@@ -3217,45 +3735,67 @@ function renderProcessHeatLegend() {
     `;
 }
 
-function renderProcessRuleLegend() {
-    const ruleItems = [
+function renderProcessRuleLegend(options = {}) {
+    const { showVariantRules = false } = options;
+    const baseItems = [
+        {
+            key: "main-spine",
+            label: "メインルート (実線・太)",
+            description: "最も件数の多い主経路です。",
+            toneClass: "process-rule-legend-visual--main-spine",
+        },
+        {
+            key: "forward",
+            label: "順方向の遷移 (実線)",
+            description: "前のステップから後のステップへ進む遷移です。",
+            toneClass: "process-rule-legend-visual--forward",
+        },
+        {
+            key: "return",
+            label: "戻り・ループ (破線)",
+            description: "後のステップから前のステップへ戻る遷移です。",
+            toneClass: "process-rule-legend-visual--return",
+        },
         {
             key: "selected",
             label: "選択強調 (外枠 / シャドウ)",
-            description: "Activity / Transition / Case trace で選択中の対象です。",
+            description: "アクティビティ / 遷移 / ケース追跡で選択中の対象です。",
             toneClass: "process-rule-legend-visual--selected",
         },
         {
             key: "dimmed",
-            label: "非選択 (dimmed)",
-            description: "選択中以外の activity / transition を薄く表示します。",
+            label: "非選択 (薄表示)",
+            description: "選択中以外のアクティビティ / 遷移を薄く表示します。",
             toneClass: "process-rule-legend-visual--dimmed",
         },
+    ];
+    const variantItems = [
         {
             key: "variant-added",
-            label: "Variant 固有ルート (差分色)",
-            description: "比較基準 Variant に無い activity / transition を差分色で示します。",
+            label: "バリアント固有ルート (差分色)",
+            description: "比較基準バリアントに無いアクティビティ / 遷移を差分色で示します。",
             toneClass: "process-rule-legend-visual--variant-added",
         },
         {
             key: "variant-common",
-            label: "Variant 共通ルート (共通色)",
-            description: "比較基準 Variant と共通するルートです。",
+            label: "バリアント共通ルート (共通色)",
+            description: "比較基準バリアントと共通するルートです。",
             toneClass: "process-rule-legend-visual--variant-common",
         },
         {
             key: "branch-focus",
-            label: "分岐ポイント focus (専用色)",
-            description: "差分サマリーの分岐ポイント chip で選択した区間です。",
+            label: "分岐ポイント選択 (専用色)",
+            description: "差分サマリーの分岐ポイントで選択した区間です。",
             toneClass: "process-rule-legend-visual--branch-focus",
         },
     ];
+    const ruleItems = showVariantRules ? baseItems.concat(variantItems) : baseItems;
 
     return `
-        <section class="process-rule-legend" aria-label="Process map display rules">
+        <section class="process-rule-legend" aria-label="フロー図の表示ルール">
             <div class="process-explorer-control-head">
                 <span>表示ルール</span>
-                <strong>Map guide</strong>
+                <strong>ガイド</strong>
             </div>
             <div class="process-rule-legend-grid">
                 ${ruleItems.map((item) => `
@@ -3271,7 +3811,7 @@ function renderProcessRuleLegend() {
                     </article>
                 `).join("")}
             </div>
-            <p class="process-rule-legend-note">待ち時間の色分けは Heatmap、外枠と差分色の意味はこの凡例を参照してください。</p>
+            <p class="process-rule-legend-note">所要時間の色分けはヒートマップを参照してください。</p>
         </section>
     `;
 }
@@ -3331,6 +3871,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
     let caseTraceTransitions = new Set();
     let variants = [];
     let variantCoverage = null;
+    let variantCoverageTotalCaseCount = 0;
     let variantErrorMessage = "";
     let variantViewState = getDefaultVariantViewState();
     let variantDiffState = buildVariantDiffState([], null);
@@ -3551,7 +4092,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
     }
 
     async function refreshDetailAnalysisPanels() {
-        const detailData = await loadAnalysisPage(runId, 0, activeDetailFilters);
+        const detailData = await loadAnalysisPage(runId, 0, activeDetailFilters, getInitialDetailLoadOptions());
         const analysis = detailData.analyses[analysisKey];
 
         if (!analysis) {
@@ -3566,12 +4107,26 @@ async function initializePatternFlowExplorer(runId, impact = null) {
         activeDetailFilters = cloneDetailFilters(detailData.applied_filters || DEFAULT_DETAIL_FILTERS);
         draftDetailFilters = cloneDetailFilters(activeDetailFilters);
         impactSummary = detailData.impact || { has_data: false, rows: [] };
+        currentRenderedAnalysis = analysis;
+        currentDetailSummaryData = {
+            source_file_name: detailData.source_file_name,
+            case_count: detailData.case_count,
+            event_count: detailData.event_count,
+            dashboard: detailData.dashboard,
+            impact: detailData.impact,
+            insights: detailData.insights,
+            root_cause: detailData.root_cause,
+            applied_filters: detailData.applied_filters,
+            column_settings: detailData.column_settings,
+        };
+        pendingDetailSupplementSections = new Set(detailData.deferred_sections || []);
+        detailSupplementErrorMessage = "";
         filteredCounts = {
             caseCount: Number(detailData.case_count || 0),
             eventCount: Number(detailData.event_count || 0),
         };
 
-        renderSummary(detailData, analysis);
+        renderSummary(currentDetailSummaryData, analysis);
         if (analysisKey === "pattern") {
             resultPanel.className = "result-panel hidden";
             resultPanel.innerHTML = "";
@@ -3586,9 +4141,10 @@ async function initializePatternFlowExplorer(runId, impact = null) {
             caseId: caseTracePayload?.found ? caseTracePayload.case_id : "",
             filterDefs: filterDefinitions,
         });
-        await syncAiInsightsPanel(runId, analysis.analysis_name);
         renderFilterSummary();
         syncDetailFilterControls();
+        void syncAiInsightsPanel(runId, analysis.analysis_name);
+        void refreshDeferredDetailSections(runId);
         return detailData;
     }
 
@@ -3600,8 +4156,10 @@ async function initializePatternFlowExplorer(runId, impact = null) {
 
         try {
             await refreshDetailAnalysisPanels();
-            await refreshVariantSummary();
-            await refreshBottleneckSummary();
+            await Promise.all([
+                refreshVariantSummary(),
+                refreshBottleneckSummary(),
+            ]);
             syncDetailFilterControls();
             syncVariantPanel();
             syncBottleneckPanel();
@@ -3689,14 +4247,14 @@ async function initializePatternFlowExplorer(runId, impact = null) {
         case "case-trace":
             return {
                 source: activeSource,
-                title: `Case trace: ${caseTraceCaseId || "-"}`,
-                meta: "Case ID検索で見つかったケース経路を強調しています。全体表示で解除できます。",
+                title: `ケース追跡: ${caseTraceCaseId || "-"}`,
+                meta: "ケースID検索で見つかったケース経路を強調しています。全体表示で解除できます。",
             };
         case "branch-focus":
             return {
                 source: activeSource,
-                title: `分岐ポイント focus: ${branchLabel}`,
-                meta: "Variant差分サマリーで選択した差分区間を強調しています。全体表示で解除できます。",
+                title: `分岐ポイント選択: ${branchLabel}`,
+                meta: "バリアント差分サマリーで選択した差分区間を強調しています。全体表示で解除できます。",
             };
         case "impact":
             return {
@@ -3707,7 +4265,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
         case "transition-bottleneck":
             return {
                 source: activeSource,
-                title: `Transition bottleneck: ${transitionLabel}`,
+                title: `遷移ボトルネック: ${transitionLabel}`,
                 meta: "Bottleneck Analysis で選択した遷移を強調しています。全体表示で解除できます。",
             };
         case "transition":
@@ -3719,8 +4277,8 @@ async function initializePatternFlowExplorer(runId, impact = null) {
         case "activity-bottleneck":
             return {
                 source: activeSource,
-                title: `Activity bottleneck: ${selectedActivity || "-"}`,
-                meta: "Bottleneck Analysis で選択した activity を強調しています。全体表示で解除できます。",
+                title: `アクティビティボトルネック: ${selectedActivity || "-"}`,
+                meta: "Bottleneck Analysis で選択したアクティビティを強調しています。全体表示で解除できます。",
             };
         case "variant":
             return {
@@ -3728,13 +4286,13 @@ async function initializePatternFlowExplorer(runId, impact = null) {
                 title: selectedVariant
                     ? `Variant #${selectedVariant.variant_id} 選択中`
                     : `Variant #${selectedVariantId} 選択中`,
-                meta: "選択した Variant に属するケースでフロー図と分析結果を表示しています。全体表示で解除できます。",
+                meta: "選択したバリアントに属するケースでフロー図と分析結果を表示しています。全体表示で解除できます。",
             };
         default:
             return {
                 source: "none",
                 title: "全体表示中",
-                meta: "現在は全ケースを使ったフロー図を表示しています。Pattern / Variant 一覧の全体表示で解除できます。",
+                meta: "現在は全ケースを使ったフロー図を表示しています。パターン / バリアント一覧の全体表示で解除できます。",
             };
         }
     }
@@ -3981,29 +4539,29 @@ async function initializePatternFlowExplorer(runId, impact = null) {
         if (selectedTransitionKey) {
             const selectedTransition = findSelectedTransitionDetails();
             return {
-                title: "Transition Case Drilldown",
+                title: "遷移ケースドリルダウン",
                 meta: selectedTransition
                     ? resolveTransitionLabel(selectedTransition, selectedTransitionKey)
                     : resolveTransitionLabel(null, selectedTransitionKey),
                 emptyMessage: "遷移別ボトルネックを選択すると、時間の長いケースを表示します。",
-                note: "上位 20 件を表示します。duration 降順です。",
+                note: "上位 20 件を表示します。所要時間の降順です。",
             };
         }
 
         if (selectedActivity) {
             return {
-                title: "Activity Case Drilldown",
-                meta: `Activity ボトルネック「${selectedActivity}」の待ち時間が長いケースです。`,
-                emptyMessage: `Activity ボトルネック「${selectedActivity}」を選択すると、時間の長いケースを表示します。`,
-                note: "上位 20 件を表示します。duration 降順です。",
+                title: "アクティビティケースドリルダウン",
+                meta: `アクティビティボトルネック「${selectedActivity}」の所要時間が長いケースです。`,
+                emptyMessage: `アクティビティボトルネック「${selectedActivity}」を選択すると、時間の長いケースを表示します。`,
+                note: "上位 20 件を表示します。所要時間の降順です。",
             };
         }
 
         return {
-            title: "Bottleneck Case Drilldown",
-            meta: "Activity または Transition のボトルネックを選択すると、時間の長いケースを表示します。",
-            emptyMessage: "Activity または Transition のボトルネックを選択すると、時間の長いケースを表示します。",
-            note: "上位 20 件を表示します。duration 降順です。",
+            title: "ボトルネックケースドリルダウン",
+            meta: "アクティビティまたは遷移のボトルネックを選択すると、時間の長いケースを表示します。",
+            emptyMessage: "アクティビティまたは遷移のボトルネックを選択すると、時間の長いケースを表示します。",
+            note: "上位 20 件を表示します。所要時間の降順です。",
         };
     }
 
@@ -4080,7 +4638,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
 
                 if (!selectedTransition) {
                     transitionCaseRows = [];
-                    transitionCaseErrorMessage = "Transition details are not available.";
+                    transitionCaseErrorMessage = "遷移の詳細を読み込めませんでした。";
                     renderTransitionCasePanel();
                     return;
                 }
@@ -4113,7 +4671,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
 
     function renderCaseTracePanel() {
         if (!searchedCaseId) {
-            caseTraceResult.innerHTML = '<p class="empty-state">Case ID を入力すると、ケースの通過順序と待ち時間を表示します。</p>';
+            caseTraceResult.innerHTML = '<p class="empty-state">ケースID を入力すると、ケースの通過順序と所要時間を表示します。</p>';
             return;
         }
 
@@ -4128,7 +4686,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
         }
 
         if (!caseTracePayload.found) {
-            caseTraceResult.innerHTML = `<p class="empty-state">Case ID「${escapeHtml(searchedCaseId)}」は見つかりませんでした。</p>`;
+            caseTraceResult.innerHTML = `<p class="empty-state">ケースID「${escapeHtml(searchedCaseId)}」は見つかりませんでした。</p>`;
             return;
         }
 
@@ -4229,7 +4787,8 @@ async function initializePatternFlowExplorer(runId, impact = null) {
                 caseCount: Number(variantPayload.filtered_case_count || 0),
                 eventCount: Number(variantPayload.filtered_event_count || 0),
             };
-            variantCoverage = buildVariantCoveragePayload(variants, filteredCounts.caseCount, 10);
+            variantCoverageTotalCaseCount = filteredCounts.caseCount;
+            variantCoverage = buildVariantCoveragePayload(variants, variantCoverageTotalCaseCount, 10);
             renderFilterSummary();
 
             if (selectedVariantId !== null && !variants.some((variant) => Number(variant.variant_id) === Number(selectedVariantId))) {
@@ -4245,6 +4804,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
             variantErrorMessage = error.message;
             variants = [];
             variantCoverage = null;
+            variantCoverageTotalCaseCount = 0;
             filteredCounts = {
                 caseCount: 0,
                 eventCount: 0,
@@ -4265,7 +4825,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
             variantPagination.className = "result-pagination variant-pagination hidden";
             variantPagination.innerHTML = "";
             variantCoverageMeta.innerHTML = '<p class="panel-note">カバー率を読み込めませんでした。</p>';
-            variantSelectionTitle.textContent = "Pattern / Variant 情報を読み込めませんでした";
+            variantSelectionTitle.textContent = "パターン / バリアント情報を読み込めませんでした";
             variantSelectionMeta.textContent = "一覧の読み込みに失敗しました。";
             variantSelectionSequence.textContent = "";
             variantSelectionSequence.title = "";
@@ -4317,7 +4877,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
         activitiesSlider.disabled = selectedVariantId !== null;
         variantCoverage = buildVariantCoveragePayload(
             variantPageState.limitedVariants,
-            filteredCounts.caseCount,
+            variantCoverageTotalCaseCount,
             variantPageState.maxVisibleCount,
             { isAllDisplay: variantPageState.isAllDisplay }
         );
@@ -4386,6 +4946,13 @@ async function initializePatternFlowExplorer(runId, impact = null) {
         });
     }
 
+    function syncRuleLegend() {
+        const container = document.getElementById("process-rule-legend-container");
+        if (container) {
+            container.innerHTML = renderProcessRuleLegend({ showVariantRules: selectedVariantId !== null });
+        }
+    }
+
     async function applyVariantSelection(nextVariantId) {
         if (nextVariantId === null) {
             resetSelectionState();
@@ -4400,6 +4967,7 @@ async function initializePatternFlowExplorer(runId, impact = null) {
             transitionCaseErrorMessage = "";
             saveFlowSelection(runId, selectedVariantId, selectedActivity, selectedTransitionKey);
         }
+        syncRuleLegend();
         await refreshBottleneckSummary();
         syncVariantPanel();
         syncBottleneckPanel();
@@ -4436,7 +5004,8 @@ async function initializePatternFlowExplorer(runId, impact = null) {
 
             const snapshot = await fetchJson(
                 `/api/runs/${encodeURIComponent(runId)}/pattern-flow?${params.toString()}`,
-                "処理フロー図の読み込みに失敗しました。"
+                "処理フロー図の読み込みに失敗しました。",
+                DETAIL_HEAVY_FETCH_TIMEOUT_MS
             );
 
             if (currentVersion !== requestVersion) {
@@ -4450,13 +5019,16 @@ async function initializePatternFlowExplorer(runId, impact = null) {
                 eventCount: Number(snapshot.filtered_event_count || 0),
             };
             renderFilterSummary();
+            const performanceSuffix = snapshot.is_large_dataset_optimized
+                ? " / 大規模データ高速表示"
+                : "";
 
             if (snapshot.selected_variant) {
-                patternsMeta.textContent = `Variant #${snapshot.selected_variant.variant_id} / 1 pattern`;
+                patternsMeta.textContent = `Variant #${snapshot.selected_variant.variant_id} / 1 パターン${performanceSuffix}`;
             } else {
-                patternsMeta.textContent = `${snapshot.pattern_window.used_pattern_count} / ${snapshot.pattern_window.effective_pattern_count} patterns`;
+                patternsMeta.textContent = `${snapshot.pattern_window.used_pattern_count} / ${snapshot.pattern_window.effective_pattern_count} パターン${performanceSuffix}`;
             }
-            activitiesMeta.textContent = `${snapshot.activity_window.visible_activity_count} / ${snapshot.activity_window.available_activity_count} activities`;
+            activitiesMeta.textContent = `${snapshot.activity_window.visible_activity_count} / ${snapshot.activity_window.available_activity_count} アクティビティ`;
 
             if (!flowData.nodes.length) {
                 mapViewport.innerHTML = renderProcessMapEmpty("表示できるフロー図がありません。表示率を広げてください。");
@@ -4601,31 +5173,10 @@ async function initializePatternFlowExplorer(runId, impact = null) {
     syncDetailFilterControls();
     renderFilterSummary();
 
-    try {
-        const variantPayload = await loadVariantList(runId, 0, activeDetailFilters);
-        variants = Array.isArray(variantPayload.variants) ? variantPayload.variants : [];
-        filteredCounts = {
-            caseCount: Number(variantPayload.filtered_case_count || 0),
-            eventCount: Number(variantPayload.filtered_event_count || 0),
-        };
-        variantCoverage = buildVariantCoveragePayload(variants, filteredCounts.caseCount, 10);
-        renderFilterSummary();
-        if (selectedVariantId !== null && !variants.some((variant) => Number(variant.variant_id) === Number(selectedVariantId))) {
-            selectedVariantId = null;
-            selectedActivity = "";
-            selectedTransitionKey = "";
-            saveFlowSelection(runId, selectedVariantId, selectedActivity, selectedTransitionKey);
-        }
-    } catch (error) {
-        variantList.innerHTML = `<p class="empty-state">${escapeHtml(error.message)}</p>`;
-        variantCoverageMeta.innerHTML = '<p class="panel-note">Coverage を取得できませんでした。</p>';
-        variantSelectionTitle.textContent = "取得失敗";
-        variantSelectionMeta.textContent = "Variant 一覧の読み込みに失敗しました。";
-        variantSelectionSequence.textContent = "";
-    }
-
-    await refreshVariantSummary();
-    await refreshBottleneckSummary();
+    await Promise.all([
+        refreshVariantSummary(),
+        refreshBottleneckSummary(),
+    ]);
 
     syncVariantPanel();
     syncBottleneckPanel();
@@ -4639,6 +5190,15 @@ async function initializePatternFlowExplorer(runId, impact = null) {
 }
 
 function attachProcessMapInteractions(viewportElement) {
+    if (previousProcessMapMouseMoveHandler) {
+        window.removeEventListener("mousemove", previousProcessMapMouseMoveHandler);
+        previousProcessMapMouseMoveHandler = null;
+    }
+    if (previousProcessMapMouseUpHandler) {
+        window.removeEventListener("mouseup", previousProcessMapMouseUpHandler);
+        previousProcessMapMouseUpHandler = null;
+    }
+
     const svgElement = viewportElement.querySelector("svg.process-map-svg");
     const zoomIndicator = viewportElement.querySelector(".process-map-zoom-indicator");
     if (!svgElement) return;
@@ -4662,17 +5222,22 @@ function attachProcessMapInteractions(viewportElement) {
         e.preventDefault();
     });
 
-    window.addEventListener("mousemove", (e) => {
+    const mouseMoveHandler = (e) => {
         if (!isDragging) return;
         currentPanX = e.clientX - startPanX;
         currentPanY = e.clientY - startPanY;
         applyTransform();
-    });
+    };
 
-    window.addEventListener("mouseup", () => {
+    const mouseUpHandler = () => {
         isDragging = false;
-        if(svgElement) svgElement.style.cursor = "grab";
-    });
+        if (svgElement) svgElement.style.cursor = "grab";
+    };
+
+    window.addEventListener("mousemove", mouseMoveHandler);
+    window.addEventListener("mouseup", mouseUpHandler);
+    previousProcessMapMouseMoveHandler = mouseMoveHandler;
+    previousProcessMapMouseUpHandler = mouseUpHandler;
 
     svgElement.addEventListener("wheel", (e) => {
         e.preventDefault();
@@ -4784,7 +5349,7 @@ function renderPatternChart(analysis, runId, impact = null) {
 
     chartPanel.className = "result-panel";
     chartTitle.textContent = "業務全体フロー図";
-    chartNote.textContent = "大きなデータでは初期表示を自動で絞っています。ラベルは件数と平均所要時間を切り替えられ、Pattern / Variant を選ぶとそのルートのケースだけでフロー図を再描画します。";
+    chartNote.textContent = "大きなデータでは初期表示を自動で絞っています。ラベルは件数と平均所要時間を切り替えられ、パターン / バリアントを選ぶとそのルートのケースだけでフロー図を再描画します。";
     chartContainer.innerHTML = `
         <details class="detail-filter-panel">
             <summary>分析対象条件を絞り込む</summary>
@@ -4798,14 +5363,14 @@ function renderPatternChart(analysis, runId, impact = null) {
                     <input id="detail-light-date-to" type="date">
                 </label>
                 <label class="detail-filter-field">
-                    <span>Activity 条件</span>
+                    <span>アクティビティ 条件</span>
                     <select id="detail-light-activity-mode">
                         <option value="include">含む</option>
                         <option value="exclude">除外</option>
                     </select>
                 </label>
                 <label class="detail-filter-field detail-filter-field--wide">
-                    <span>Activity 絞り込み</span>
+                    <span>アクティビティ 絞り込み</span>
                     <select id="detail-light-activity-values" multiple size="4"></select>
                 </label>
                 <div class="detail-filter-actions">
@@ -4820,7 +5385,7 @@ function renderPatternChart(analysis, runId, impact = null) {
             <div id="current-selection-state" class="selection-state-banner" data-selection-source="none">
                 <span class="selection-state-label">現在の選択状態</span>
                 <strong id="current-selection-state-title" class="selection-state-title">全体表示中</strong>
-                <p id="current-selection-state-meta" class="selection-state-meta">Pattern / Variant 一覧の全体表示で解除できます。</p>
+                <p id="current-selection-state-meta" class="selection-state-meta">パターン / バリアント一覧の全体表示で解除できます。</p>
             </div>
         </details>
         <div class="process-explorer-shell">
@@ -4874,7 +5439,7 @@ function renderPatternChart(analysis, runId, impact = null) {
                 </section>
                 <section class="process-explorer-control">
                     <div class="process-explorer-control-head">
-                        <span>Labels</span>
+                        <span>ラベル</span>
                         <strong>切替</strong>
                     </div>
                     <div class="process-map-label-toggle" role="group" aria-label="フロー図ラベル表示">
@@ -4883,14 +5448,14 @@ function renderPatternChart(analysis, runId, impact = null) {
                     </div>
                     <p id="process-map-label-mode-meta" class="process-explorer-meta">表示中: 件数</p>
                 </section>
-                ${renderProcessRuleLegend()}
+                <div id="process-rule-legend-container">${renderProcessRuleLegend()}</div>
                 ${renderProcessHeatLegend()}
             </aside>
         </div>
         <section class="variant-panel">
             <div class="result-header variant-panel-header">
                 <div>
-                    <h3>Pattern / Variant 一覧</h3>
+                    <h3>パターン / バリアント一覧</h3>
                     <p class="result-meta">件数の多いルートを一覧で確認できます。行クリックでフロー図をそのルートに切り替え、詳細ボタンで個別ページへ移動できます。</p>
                 </div>
                 <button id="variant-reset-button" type="button" class="ghost-link process-explorer-button">全体表示</button>
@@ -4902,7 +5467,7 @@ function renderPatternChart(analysis, runId, impact = null) {
                 </article>
                 <article class="variant-selection-card">
                     <p id="variant-selection-title" class="variant-selection-title">全体表示中</p>
-                    <p id="variant-selection-meta" class="panel-note">Pattern / Variant を選択すると、そのルートに属するケースだけでフロー図を再描画します。</p>
+                    <p id="variant-selection-meta" class="panel-note">パターン / バリアントを選択すると、そのルートに属するケースだけでフロー図を再描画します。</p>
                     <p id="variant-selection-sequence" class="variant-selection-sequence">現在は全ケースを使ったフロー図を表示しています。</p>
                     <div id="variant-selection-diff"></div>
                 </article>
@@ -4910,14 +5475,14 @@ function renderPatternChart(analysis, runId, impact = null) {
             <div class="variant-controls">
                 <label class="field">
                     <span>検索</span>
-                    <input id="variant-search-input" type="search" placeholder="Pattern名 / Activity名 で検索">
+                    <input id="variant-search-input" type="search" placeholder="パターン名 / アクティビティ名 で検索">
                 </label>
                 <label class="field">
                     <span>並び順</span>
                     <select id="variant-sort-select">
                         <option value="count">件数順</option>
                         <option value="ratio">比率順</option>
-                        <option value="avg_case_duration_sec">平均所要時間順</option>
+                        <option value="avg_case_duration_sec">平均処理時間順</option>
                         <option value="activity_count">アクティビティ数順</option>
                     </select>
                 </label>
@@ -4936,10 +5501,11 @@ function renderPatternChart(analysis, runId, impact = null) {
             <div class="variant-list-table">
                 <div class="variant-list-head" aria-hidden="true">
                     <span>順位</span>
-                    <span>Pattern / Variant</span>
+                    <span>パターン / バリアント</span>
+                    <span>繰り返し</span>
                     <span>件数</span>
                     <span>比率</span>
-                    <span>平均所要時間</span>
+                    <span>平均処理時間</span>
                     <span>ルート</span>
                 </div>
                 <div id="variant-list" class="variant-list"></div>
@@ -4948,21 +5514,21 @@ function renderPatternChart(analysis, runId, impact = null) {
         </section>
         ${buildImpactSectionHtml(impact)}
         <details id="case-trace-panel" class="result-panel">
-            <summary>Case ID 検索 / ケース追跡</summary>
+            <summary>ケースID 検索 / ケース追跡</summary>
             <form id="case-trace-form" class="case-trace-form">
                 <input
                     id="case-trace-input"
                     class="case-trace-input"
                     type="text"
                     name="case_id"
-                    placeholder="Case ID を入力"
+                    placeholder="ケースID を入力"
                     autocomplete="off"
                     spellcheck="false"
                 >
                 <button type="submit" class="detail-link process-explorer-button process-explorer-button--primary">検索</button>
             </form>
             <div id="case-trace-result" class="case-trace-result">
-                <p class="empty-state">Case ID を入力すると、ケースの通過順序と各工程の所要時間を表示します。</p>
+                <p class="empty-state">ケースID を入力すると、ケースの通過順序と各工程の所要時間を表示します。</p>
             </div>
         </details>
     `;
@@ -4999,6 +5565,11 @@ async function renderDetailPage() {
     activeDetailFilters = cloneDetailFilters(DEFAULT_DETAIL_FILTERS);
     currentDetailColumnSettings = {};
     detailPageAnalysisLoader = null;
+    pendingDetailSupplementSections = new Set();
+    detailSupplementErrorMessage = "";
+    currentDetailSummaryData = null;
+    currentRenderedAnalysis = null;
+    detailSupplementRequestVersion = 0;
 
     if (!analysisKey) {
         setStatus("分析キーを特定できませんでした。", "error");
@@ -5013,7 +5584,7 @@ async function renderDetailPage() {
     setStatus("詳細を読み込んでいます...", "info");
 
     try {
-        const detailData = await loadAnalysisPage(runId, 0, activeDetailFilters);
+        const detailData = await loadAnalysisPage(runId, 0, activeDetailFilters, getInitialDetailLoadOptions());
         const analysis = detailData.analyses[analysisKey];
 
         if (!analysis) {
@@ -5022,6 +5593,20 @@ async function renderDetailPage() {
 
         activeDetailFilters = cloneDetailFilters(detailData.applied_filters || DEFAULT_DETAIL_FILTERS);
         currentDetailColumnSettings = detailData.column_settings || {};
+        currentRenderedAnalysis = analysis;
+        currentDetailSummaryData = {
+            source_file_name: detailData.source_file_name,
+            case_count: detailData.case_count,
+            event_count: detailData.event_count,
+            dashboard: detailData.dashboard,
+            impact: detailData.impact,
+            insights: detailData.insights,
+            root_cause: detailData.root_cause,
+            applied_filters: detailData.applied_filters,
+            column_settings: detailData.column_settings,
+        };
+        pendingDetailSupplementSections = new Set(detailData.deferred_sections || []);
+        detailSupplementErrorMessage = "";
 
         if (detailExportExcelButton) {
             detailExportExcelButton.onclick = () => {
@@ -5043,7 +5628,7 @@ async function renderDetailPage() {
             setStatus("表を読み込んでいます...", "info");
 
             try {
-                const pageData = await loadAnalysisPage(runId, rowOffset, activeDetailFilters);
+                const pageData = await loadAnalysisPage(runId, rowOffset, activeDetailFilters, getInitialDetailLoadOptions());
 
                 if (currentVersion !== detailRequestVersion) {
                     return;
@@ -5054,7 +5639,9 @@ async function renderDetailPage() {
                     throw new Error("指定した分析結果が見つかりません。");
                 }
 
-                renderSummary(pageData, pageAnalysis);
+                currentRenderedAnalysis = pageAnalysis;
+                mergeDetailSummaryData(pageData);
+                renderSummary(currentDetailSummaryData || pageData, pageAnalysis);
                 if (analysisKey === "pattern") {
                     resultPanel.className = "result-panel hidden";
                     resultPanel.innerHTML = "";
@@ -5064,8 +5651,8 @@ async function renderDetailPage() {
                 syncDetailExportPanel(pageAnalysis.analysis_name, {
                     filters: activeDetailFilters,
                 });
-                await syncAiInsightsPanel(runId, pageAnalysis.analysis_name);
                 hideStatus();
+                void syncAiInsightsPanel(runId, pageAnalysis.analysis_name);
             } catch (error) {
                 if (currentVersion !== detailRequestVersion) {
                     return;
@@ -5078,7 +5665,7 @@ async function renderDetailPage() {
         detailPageAnalysisLoader = renderAnalysisPage;
         detailPageTitle.textContent = analysis.analysis_name;
         detailPageCopy.textContent = "指定した分析実行の全件結果を表示しています。";
-        renderSummary(detailData, analysis);
+        renderSummary(currentDetailSummaryData, analysis);
         await renderChart(analysis, runId, detailData);
         if (analysisKey === "pattern") {
             resultPanel.className = "result-panel hidden";
@@ -5089,8 +5676,9 @@ async function renderDetailPage() {
         syncDetailExportPanel(analysis.analysis_name, {
             filters: activeDetailFilters,
         });
-        await syncAiInsightsPanel(runId, analysis.analysis_name);
         hideStatus();
+        void syncAiInsightsPanel(runId, analysis.analysis_name);
+        void refreshDeferredDetailSections(runId);
     } catch (error) {
         summaryPanel.className = "summary-panel hidden";
         chartPanel.className = "result-panel hidden";
@@ -5100,4 +5688,3 @@ async function renderDetailPage() {
 }
 
 void renderDetailPage();
-

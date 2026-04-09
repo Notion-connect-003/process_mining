@@ -6,12 +6,12 @@ ANALYSIS_CONFIG = {
         "activity": "アクティビティ",
         "event_count": "イベント件数",
         "case_count": "ケース数",
-        "total_duration_min": "合計時間(分)",
-        "avg_duration_min": "平均時間(分)",
-        "median_duration_min": "中央値時間(分)",
+        "total_duration_min": "合計処理時間(分)",
+        "avg_duration_min": "平均処理時間(分)",
+        "median_duration_min": "中央値処理時間(分)",
         "std_duration_min": "標準偏差(分)",
-        "min_duration_min": "最小時間(分)",
-        "max_duration_min": "最大時間(分)",
+        "min_duration_min": "最小処理時間(分)",
+        "max_duration_min": "最大処理時間(分)",
         "p75_duration_min": "75%点(分)",
         "p90_duration_min": "90%点(分)",
         "p95_duration_min": "95%点(分)",
@@ -21,10 +21,16 @@ ANALYSIS_CONFIG = {
 
 
 
-def create_frequency_analysis(df):
+def create_frequency_analysis(df, group_columns=None):
     # アクティビティごとの件数と処理時間を集計します。
+    # group_columns が指定された場合はグルーピングモードとして集計します。
+    if group_columns:
+        groupby_keys = [col for col in group_columns if col in df.columns] + ["activity"]
+    else:
+        groupby_keys = ["activity"]
+
     result = (
-        df.groupby("activity")
+        df.groupby(groupby_keys)
         .agg(
             event_count=("activity", "count"),
             case_count=("case_id", "nunique"),
@@ -63,4 +69,7 @@ def create_frequency_analysis(df):
         .where(result["std_duration_min"].notna(), other="-")
     )
 
-    return result.sort_values(["event_count", "activity"], ascending=[False, True]).reset_index(drop=True)
+    valid_group_cols = [col for col in (group_columns or []) if col in df.columns]
+    sort_keys = valid_group_cols + ["event_count", "activity"]
+    sort_ascending = [True] * len(valid_group_cols) + [False, True]
+    return result.sort_values(sort_keys, ascending=sort_ascending).reset_index(drop=True)

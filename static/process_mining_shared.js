@@ -77,6 +77,30 @@
         return `${fromActivity}__TO__${toActivity}`;
     }
 
+    function showTooltip(event, html) {
+        let tip = document.getElementById("pl-tooltip");
+        if (!tip) {
+            tip = document.createElement("div");
+            tip.id = "pl-tooltip";
+            tip.className = "tooltip";
+            tip.style.display = "none";
+            document.body.appendChild(tip);
+        }
+
+        tip.innerHTML = html;
+        tip.style.display = "block";
+        const rect = event.target.getBoundingClientRect();
+        tip.style.left = `${rect.left + rect.width / 2 - tip.offsetWidth / 2}px`;
+        tip.style.top = `${rect.top - tip.offsetHeight - 8 + window.scrollY}px`;
+    }
+
+    function hideTooltip() {
+        const tip = document.getElementById("pl-tooltip");
+        if (tip) {
+            tip.style.display = "none";
+        }
+    }
+
     async function fetchJson(url, fallbackMessage, timeoutMs = 30000) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -94,7 +118,7 @@
         } catch (error) {
             clearTimeout(timeoutId);
             if (error.name === "AbortError") {
-                throw new Error("サーバーからの応答がタイムアウトしました。データ量を絞らして再試行してください。");
+                throw new Error("サーバーからの応答がタイムアウトしました。データ量を絞って再試行してください。");
             }
             throw error;
         }
@@ -165,7 +189,7 @@
 
         return `
             <div class="table-wrap">
-                <table>
+                <table class="data-table">
                     <thead><tr>${headHtml}</tr></thead>
                     <tbody>${bodyHtml}</tbody>
                 </table>
@@ -183,6 +207,8 @@
         formatDateTime,
         formatDurationSeconds,
         buildTransitionKey,
+        showTooltip,
+        hideTooltip,
         fetchJson,
         buildTable,
     };

@@ -10,68 +10,86 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v={{ static_version }}">
 </head>
 <body class="app-shell app-shell--detail" data-analysis-key="{{ analysis_key }}">
-    <header class="top-header">
-        <a href="/" class="top-logo">
-            <div class="logo-mark">PL</div>
-            <div class="logo-name">Process<span>Lens</span></div>
-        </a>
-        <div class="header-breadcrumb">
-            <span>Home</span>
-            <span class="sep">/</span>
-            <span>Analysis</span>
-            <span class="sep">/</span>
-            <span class="current">{{ analysis_name }}</span>
+    <header class="dashboard-app-header">
+        <div class="dashboard-app-header-copy">
+            <div class="dashboard-app-header-title">ProcessLens</div>
         </div>
-        <div class="header-right">
-            <a href="/" class="hbtn">ダッシュボード</a>
-            <a href="/analysis/pattern" class="hbtn">パターン分析</a>
+        <div class="dashboard-app-header-center">
+            <a href="/">ホーム</a>
+            <span class="sep">/</span>
+            <a href="/">ダッシュボード</a>
+            <span class="sep">/</span>
+            <span class="dashboard-app-header-current">{{ analysis_name }}</span>
+        </div>
+        <div class="dashboard-app-header-actions">
+            <a href="/" class="hbtn dashboard-toolbar-button">ダッシュボード</a>
         </div>
     </header>
 
-    <div class="layout">
-        <aside class="sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-label">Menu</div>
-                <a class="nav-item" href="/">
-                    <div class="nav-dot blue">DB</div>
-                    ダッシュボード
+    <div class="dashboard-layout">
+        <aside class="dashboard-sidebar">
+            <div class="dashboard-sidebar-group">
+                <div class="dashboard-sidebar-label">メニュー</div>
+                <a class="dashboard-side-link" href="/">
+                    <span class="dashboard-side-icon">▣</span>
+                    <span>ダッシュボード</span>
                 </a>
-                <a class="nav-item active" href="/analysis/{{ analysis_key }}">
-                    <div class="nav-dot violet">DT</div>
-                    詳細ビュー
-                </a>
-                <a class="nav-item" href="/">
-                    <div class="nav-dot gray">BK</div>
-                    ダッシュボードへ戻る
+                <a class="dashboard-side-link is-active" href="/analysis/{{ analysis_key }}">
+                    <span class="dashboard-side-icon">◫</span>
+                    <span>詳細ビュー</span>
                 </a>
             </div>
-            <div class="sidebar-section">
-                <div class="sidebar-label">Analysis</div>
-                <a class="nav-item{% if analysis_key == 'frequency' %} active{% endif %}" href="/analysis/frequency">
-                    <div class="nav-dot blue">FR</div>
-                    頻度分析
+
+            <div class="dashboard-sidebar-group">
+                <div class="dashboard-sidebar-label">分析</div>
+                <a class="dashboard-side-link{% if analysis_key == 'frequency' %} is-active{% endif %}" href="/analysis/frequency">
+                    <span class="dashboard-side-icon">◧</span>
+                    <span>頻度分析</span>
                 </a>
-                <a class="nav-item{% if analysis_key == 'transition' %} active{% endif %}" href="/analysis/transition">
-                    <div class="nav-dot green">TR</div>
-                    前後処理分析
+                <a class="dashboard-side-link{% if analysis_key == 'transition' %} is-active{% endif %}" href="/analysis/transition">
+                    <span class="dashboard-side-icon">◨</span>
+                    <span>前後処理分析</span>
                 </a>
-                <a class="nav-item{% if analysis_key == 'pattern' %} active{% endif %}" href="/analysis/pattern">
-                    <div class="nav-dot violet">PT</div>
-                    処理順パターン分析
+                <a class="dashboard-side-link{% if analysis_key == 'pattern' %} is-active{% endif %}" href="/analysis/pattern">
+                    <span class="dashboard-side-icon">◩</span>
+                    <span>処理順パターン分析</span>
+                </a>
+            </div>
+
+            <div class="dashboard-sidebar-group">
+                <div class="dashboard-sidebar-label">ツール</div>
+                <a class="dashboard-side-link" href="#detail-export-panel">
+                    <span class="dashboard-side-icon">◎</span>
+                    <span>Excelレポート</span>
+                </a>
+                <a class="dashboard-side-link" href="#ai-insights-section">
+                    <span class="dashboard-side-icon">◌</span>
+                    <span>分析コメント</span>
                 </a>
             </div>
         </aside>
 
-        <main class="app-main">
-            <div class="page-shell page-shell--detail">
-                <section class="detail-hero">
-                    <div>
+        <main class="dashboard-main">
+            <div class="dashboard-main-shell detail-main-shell">
+                <section class="dashboard-utility-bar">
+                    <div class="dashboard-breadcrumb">
+                        <a href="/">ホーム</a>
+                        <span class="sep">/</span>
+                        <a href="/">ダッシュボード</a>
+                        <span class="sep">/</span>
+                        <span class="dashboard-breadcrumb-current">{{ analysis_name }}</span>
+                    </div>
+                    <div class="dashboard-utility-note">TOP画面と同じ配色と余白で、分析結果の要点から詳細テーブルまで連続して確認できます。</div>
+                </section>
+
+                <section class="detail-hero detail-hero--unified">
+                    <div class="detail-hero-copy">
                         <p class="eyebrow">ProcessLens Detail</p>
                         <h1 id="detail-page-title">{{ analysis_name }}</h1>
                         <p id="detail-page-copy" class="hero-copy">分析条件に応じた詳細結果とドリルダウンを表示します。集計表、補助チャート、ケース単位の深掘りを同じ画面で確認できます。</p>
                     </div>
                     <div class="detail-hero-actions">
-                        <a href="/" class="ghost-link">ダッシュボードへ戻る</a>
+                        <a href="/" class="hbtn">ダッシュボードへ戻る</a>
                     </div>
                 </section>
 
@@ -95,13 +113,13 @@
                 <section id="ai-insights-section" class="result-panel">
                     <div class="result-header">
                         <div>
-                            <h2 id="ai-insights-title">AI解説</h2>
+                            <h2 id="ai-insights-title">分析コメント</h2>
                             <p id="ai-insights-meta" class="result-meta">分析ごとに生成し、画面を切り替えても同じ条件なら再表示されます。</p>
                         </div>
                         <div class="ai-insights-actions">
                             <span id="ai-insights-state" class="ai-insights-chip">未生成</span>
                             <button id="ai-insights-btn" type="button" class="hbtn primary" style="white-space:nowrap;">
-                                AI解説を生成
+                                分析コメントを生成
                             </button>
                         </div>
                     </div>

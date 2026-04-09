@@ -3,199 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProcessLens | イベントログ分析</title>
+    <title>ProcessLens | ダッシュボード</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v={{ static_version }}">
 </head>
 <body class="app-shell app-shell--top">
-    <header class="top-header">
-        <a href="/" class="top-logo">
-            <div class="logo-mark">PL</div>
-            <div class="logo-name">Process<span>Lens</span></div>
-        </a>
-        <div class="header-breadcrumb">
-            <span>Home</span>
-            <span class="sep">/</span>
-            <span>Workbench</span>
-            <span class="sep">/</span>
-            <span class="current">イベントログ分析</span>
+    <header class="dashboard-app-header">
+        <div class="dashboard-app-header-copy">
+            <div class="dashboard-app-header-title">ProcessLens</div>
         </div>
-        <div class="header-right">
-            <a href="/" class="hbtn">ダッシュボード</a>
-            <a href="/analysis/pattern" class="hbtn">パターン分析</a>
-            <a href="#analyze-form" class="hbtn primary">新規分析</a>
+        <div class="dashboard-app-header-center">
+            <a href="/">ホーム</a>
+            <span class="sep">/</span>
+            <a href="/">ダッシュボード</a>
+        </div>
+        <div class="dashboard-app-header-actions">
+            <button type="button" id="top-open-csv-button" class="hbtn primary dashboard-toolbar-button">新しいCSVを読込</button>
         </div>
     </header>
 
-    <div class="layout">
-        <aside class="sidebar">
-            <div class="sidebar-section">
-                <div class="sidebar-label">Menu</div>
-                <a class="nav-item active" href="/">
-                    <div class="nav-dot blue">DB</div>
-                    ダッシュボード
+    <div class="dashboard-layout">
+        <aside class="dashboard-sidebar">
+            <div class="dashboard-sidebar-group">
+                <div class="dashboard-sidebar-label">メニュー</div>
+                <a class="dashboard-side-link is-active" href="/">
+                    <span class="dashboard-side-icon">▣</span>
+                    <span>ダッシュボード</span>
                 </a>
-                <a class="nav-item" href="#analyze-form">
-                    <div class="nav-dot green">FI</div>
-                    ファイル設定
-                </a>
-                <a class="nav-item" href="#result-panels">
-                    <div class="nav-dot violet">RS</div>
-                    分析結果
+                <a class="dashboard-side-link" href="#setup-section">
+                    <span class="dashboard-side-icon">◫</span>
+                    <span>分析設定</span>
                 </a>
             </div>
-            <div class="sidebar-section">
-                <div class="sidebar-label">Analysis</div>
-                <a class="nav-item" href="/analysis/frequency">
-                    <div class="nav-dot blue">FR</div>
-                    頻度分析
+
+            <div class="dashboard-sidebar-group">
+                <div class="dashboard-sidebar-label">分析</div>
+                <a class="dashboard-side-link" href="/analysis/frequency">
+                    <span class="dashboard-side-icon">◧</span>
+                    <span>頻度分析</span>
                 </a>
-                <a class="nav-item" href="/analysis/transition">
-                    <div class="nav-dot green">TR</div>
-                    前後処理分析
+                <a class="dashboard-side-link" href="/analysis/transition">
+                    <span class="dashboard-side-icon">◨</span>
+                    <span>前後処理分析</span>
                 </a>
-                <a class="nav-item" href="/analysis/pattern">
-                    <div class="nav-dot violet">PT</div>
-                    処理順パターン分析
+                <a class="dashboard-side-link" href="/analysis/pattern">
+                    <span class="dashboard-side-icon">◩</span>
+                    <span>処理順パターン分析</span>
                 </a>
             </div>
-            <div class="sidebar-section">
-                <div class="sidebar-label">Support</div>
-                <a class="nav-item" href="#log-diagnostics-panel">
-                    <div class="nav-dot amber">LG</div>
-                    ログ診断
+
+            <div class="dashboard-sidebar-group">
+                <div class="dashboard-sidebar-label">ツール</div>
+                <a class="dashboard-side-link" href="#log-diagnostics-panel">
+                    <span class="dashboard-side-icon">◎</span>
+                    <span>ログ診断</span>
                 </a>
-                <a class="nav-item" href="#result-panels">
-                    <div class="nav-dot gray">PV</div>
-                    プレビュー
+                <a class="dashboard-side-link" href="#result-panels">
+                    <span class="dashboard-side-icon">◌</span>
+                    <span>分析プレビュー</span>
                 </a>
             </div>
         </aside>
 
-        <main class="app-main">
-            <div class="page-shell">
-                <div class="page-title-block">
-                    <div class="page-title">イベントログをブラウザで分析</div>
-                    <div class="page-subtitle">
-                        CSV をアップロードし、列マッピングと分析条件を設定して結果を確認できます。
-                        ファイル未選択時は <a href="#analyze-form">{{ sample_file_name }}</a> をそのまま使えます。
-                    </div>
-                </div>
+        <main class="dashboard-main">
+            <div class="dashboard-main-shell dashboard-main-shell--top">
+                <section class="dashboard-utility-bar">
+                    <div class="dashboard-breadcrumb">ホーム / ダッシュボード / TOP画面</div>
+                    <div class="dashboard-utility-note">CSV設定と分析結果を一画面で比較しながら、次の詳細確認先を判断できます。</div>
+                </section>
 
-                <div class="steps" aria-hidden="true">
-                    <div class="step done">
-                        <div class="step-num">1</div>
-                        読み込み
+                <section class="dashboard-title-row dashboard-title-row--hero">
+                    <div class="dashboard-title-icon">▥</div>
+                    <div class="dashboard-title-copy">
+                        <h1>ダッシュボード</h1>
+                        <p>
+                            CSV を読み込み、列マッピングと分析条件を設定して、頻度分析・前後処理分析・処理順パターン分析を比較します。
+                            現在は <a href="#setup-section">{{ sample_file_name }}</a> を基準に利用できます。
+                        </p>
                     </div>
-                    <div class="step-arrow"></div>
-                    <div class="step done">
-                        <div class="step-num">2</div>
-                        マッピング
-                    </div>
-                    <div class="step-arrow"></div>
-                    <div class="step done">
-                        <div class="step-num">3</div>
-                        診断
-                    </div>
-                    <div class="step-arrow"></div>
-                    <div class="step active">
-                        <div class="step-num">4</div>
-                        フィルター
-                    </div>
-                    <div class="step-arrow"></div>
-                    <div class="step">
-                        <div class="step-num">5</div>
-                        分析
-                    </div>
-                </div>
+                </section>
 
-                <form id="analyze-form" class="analyze-form">
-                    <section class="section-card">
-                        <div class="section-head">
-                            <div class="section-icon si-blue">CSV</div>
-                            <div class="section-head-copy">
-                                <div class="section-title">CSV 読み込み</div>
-                                <div class="section-desc">分析対象のイベントログ CSV を選択します</div>
+                <form id="analyze-form" class="dashboard-form">
+                    <section id="setup-section" class="dashboard-card setup-accordion setup-accordion--summary">
+                        <button
+                            type="button"
+                            id="setup-toggle-button"
+                            class="setup-accordion-head"
+                            aria-expanded="false"
+                            aria-controls="setup-accordion-body"
+                        >
+                            <div class="setup-accordion-copy">
+                                <h2>分析設定サマリー</h2>
                             </div>
+                            <span class="setup-toggle-indicator" aria-hidden="true">▾</span>
+                        </button>
+
+                        <div class="setup-summary-bar">
+                            <span id="setup-source-tag" class="setup-tag">ファイル: {{ sample_file_name }}</span>
+                            <span id="setup-mapping-tag" class="setup-tag">列: case_id / activity / timestamp</span>
+                            <span id="setup-volume-tag" class="setup-tag">件数: ログ診断未実行</span>
+                            <button type="button" id="setup-summary-open-button" class="setup-tag setup-tag--action">設定を変更</button>
                         </div>
-                        <div class="section-body">
-                            <label class="upload-zone" for="csv-file-input">
-                                <input class="upload-input" type="file" name="csv_file" accept=".csv" id="csv-file-input">
-                                <div class="upload-title">ここに CSV をドロップ、またはクリックして選択</div>
-                                <div class="upload-sub">UTF-8 推奨 / ヘッダー行あり / サンプルファイルも利用可能</div>
-                            </label>
-                            <div class="upload-result">
-                                <div class="upload-result-icon">OK</div>
-                                <div id="column-source-note" class="upload-result-copy hint" data-source-file-name="{{ sample_file_name }}">
-                                    現在は <code>{{ sample_file_name }}</code> の設定例を表示しています。
-                                </div>
+
+                        <div id="setup-accordion-body" class="setup-accordion-body">
+                            <div class="setup-grid">
+                                <section class="setup-card">
+                                    <div class="setup-card-head">
+                                        <div class="section-icon si-blue">CSV</div>
+                                        <div>
+                                            <h3>CSV 読み込み</h3>
+                                            <p>分析対象のイベントログ CSV を選択します。</p>
+                                        </div>
+                                    </div>
+                                    <div class="setup-card-body">
+                                        <label class="upload-zone" for="csv-file-input">
+                                            <input class="upload-input" type="file" name="csv_file" accept=".csv" id="csv-file-input">
+                                            <div class="upload-title">ここに CSV をドロップ、またはクリックして選択</div>
+                                            <div class="upload-sub">UTF-8 / ヘッダー行あり / サンプルファイルも利用可能</div>
+                                        </label>
+                                        <div class="upload-result">
+                                            <div class="upload-result-icon">OK</div>
+                                            <div
+                                                id="column-source-note"
+                                                class="upload-result-copy hint"
+                                                data-source-file-name="{{ sample_file_name }}"
+                                            >
+                                                現在は <code>{{ sample_file_name }}</code> の設定を表示しています。
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="setup-card">
+                                    <div class="setup-card-head">
+                                        <div class="section-icon si-violet">MAP</div>
+                                        <div>
+                                            <h3>列マッピング</h3>
+                                            <p>ケースID / アクティビティ / タイムスタンプ列を対応付けます。</p>
+                                        </div>
+                                    </div>
+                                    <div class="setup-card-body">
+                                        <div class="grid-fields">
+                                            <label class="field">
+                                                <span>ケースID列</span>
+                                                <select name="case_id_column" id="case-id-column-select">
+                                                    <option value="">選択してください</option>
+                                                </select>
+                                            </label>
+                                            <label class="field">
+                                                <span>アクティビティ列</span>
+                                                <select name="activity_column" id="activity-column-select">
+                                                    <option value="">選択してください</option>
+                                                </select>
+                                            </label>
+                                            <label class="field">
+                                                <span>タイムスタンプ列</span>
+                                                <select name="timestamp_column" id="timestamp-column-select">
+                                                    <option value="">選択してください</option>
+                                                </select>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <details class="setup-card setup-card--full diagnostics-details" id="log-diagnostics-section" open>
+                                    <summary class="diagnostics-details-summary">
+                                        <div class="setup-card-head">
+                                            <div class="section-icon si-green">LOG</div>
+                                            <div class="section-head-copy">
+                                                <h3>ログ診断</h3>
+                                                <p>件数、期間、欠損、重複の状況を分析前に確認します。</p>
+                                            </div>
+                                            <span class="setup-toggle-indicator" aria-hidden="true">▾</span>
+                                        </div>
+                                    </summary>
+                                    <div class="diagnostics-actions">
+                                        <label class="diagnostics-export-settings" for="diagnostics-sample-limit-input">
+                                            <span>出力上限件数</span>
+                                            <input
+                                                type="number"
+                                                id="diagnostics-sample-limit-input"
+                                                min="1"
+                                                max="50000"
+                                                step="1"
+                                                value="3000"
+                                            >
+                                        </label>
+                                        <button type="button" id="download-diagnostics-excel-button" class="hbtn hbtn--excel">ログ診断をExcel出力</button>
+                                        <button type="button" id="run-diagnostics-button" class="hbtn primary">ログ診断を実行</button>
+                                    </div>
+                                    <div class="setup-card-body">
+                                        <p class="section-note">ログ診断は読み込み済み設定をそのまま使用します。条件変更後の再確認にも使えます。</p>
+                                        <div id="log-diagnostics-panel" class="diagnostics-panel">
+                                            <p class="empty-state">ログ診断を実行すると、件数、期間、欠損件数、重複状況、列サマリーを表示します。</p>
+                                        </div>
+                                    </div>
+                                </details>
                             </div>
                         </div>
                     </section>
 
-                    <section class="section-card">
-                        <div class="section-head">
-                            <div class="section-icon si-violet">MAP</div>
-                            <div class="section-head-copy">
-                                <div class="section-title">列マッピング</div>
-                                <div class="section-desc">Case ID / Activity / Timestamp に対応する列を選択します</div>
-                            </div>
-                        </div>
-                        <div class="section-body">
-                            <div class="grid-fields">
-                                <label class="field">
-                                    <span>Case ID 列</span>
-                                    <select name="case_id_column" id="case-id-column-select">
-                                        <option value="">選択してください</option>
-                                    </select>
-                                </label>
-                                <label class="field">
-                                    <span>Activity 列</span>
-                                    <select name="activity_column" id="activity-column-select">
-                                        <option value="">選択してください</option>
-                                    </select>
-                                </label>
-                                <label class="field">
-                                    <span>Timestamp 列</span>
-                                    <select name="timestamp_column" id="timestamp-column-select">
-                                        <option value="">選択してください</option>
-                                    </select>
-                                </label>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="section-card">
-                        <div class="section-head">
-                            <div class="section-icon si-green">LOG</div>
-                            <div class="section-head-copy">
-                                <div class="section-title">ログ診断</div>
-                                <div class="section-desc">件数・期間・欠損・重複の状況を先に確認できます</div>
-                            </div>
-                            <button type="button" id="run-diagnostics-button" class="hbtn primary">ログ診断を実行</button>
-                        </div>
-                        <div class="section-body">
-                            <p class="section-note">分析を始める前に実行すると、件数、期間、欠損件数、重複状況、列サマリーを確認できます。</p>
-                            <p class="section-note">ログ診断は読み込み済みの設定をそのまま使います。条件を変えた後もすぐに再確認できます。</p>
-                            <div id="log-diagnostics-panel" class="diagnostics-panel">
-                                <p class="empty-state">ログ診断を実行すると、件数・期間・欠損件数・列サマリーを表示します。</p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="section-card">
-                        <div class="section-head">
+                    <section class="dashboard-card dashboard-filter-panel">
+                        <div class="section-head dashboard-filter-head">
                             <div class="section-icon si-amber">FLT</div>
                             <div class="section-head-copy">
-                                <div class="section-title">分析条件</div>
-                                <div class="section-desc">日付範囲と属性条件で対象ケースを絞り込みます</div>
+                                <div class="section-title">フィルターバー</div>
+                                <div class="section-desc">日付と属性条件を上部で確認しながら、そのまま分析を再実行できます。</div>
                             </div>
-                            <button type="button" id="reset-filter-button" class="hbtn">条件をリセット</button>
                         </div>
+
                         <div class="section-body">
-                            <div class="grid-fields grid-fields--2">
+                            <div id="filter-chip-bar" class="dashboard-filter-chipbar"></div>
+                            <div class="dashboard-filter-row dashboard-filter-row--primary">
                                 <label class="field">
                                     <span>開始日</span>
                                     <input type="date" name="date_from" id="analysis-date-from">
@@ -204,79 +225,63 @@
                                     <span>終了日</span>
                                     <input type="date" name="date_to" id="analysis-date-to">
                                 </label>
-                            </div>
-
-                            <div class="filter-condition-list">
-                                <section class="filter-condition-card">
-                                    <p id="filter-group-title-1" class="field-group-title">グループ/カテゴリー フィルター①</p>
-                                    <div class="grid-fields grid-fields--2">
-                                        <label class="field">
-                                            <span>対象列</span>
-                                            <select name="filter_column_1" id="filter-column-1-select">
-                                                <option value="">未設定</option>
-                                            </select>
-                                        </label>
-                                        <label class="field">
-                                            <span id="filter-value-1-label">値</span>
-                                            <select name="filter_value_1" id="filter-value-1-select" disabled>
-                                                <option value="">すべて</option>
-                                            </select>
-                                        </label>
-                                    </div>
-                                </section>
-
-                                <section class="filter-condition-card">
-                                    <p id="filter-group-title-2" class="field-group-title">グループ/カテゴリー フィルター②</p>
-                                    <div class="grid-fields grid-fields--2">
-                                        <label class="field">
-                                            <span>対象列</span>
-                                            <select name="filter_column_2" id="filter-column-2-select">
-                                                <option value="">未設定</option>
-                                            </select>
-                                        </label>
-                                        <label class="field">
-                                            <span id="filter-value-2-label">値</span>
-                                            <select name="filter_value_2" id="filter-value-2-select" disabled>
-                                                <option value="">すべて</option>
-                                            </select>
-                                        </label>
-                                    </div>
-                                </section>
-
-                                <section class="filter-condition-card">
-                                    <p id="filter-group-title-3" class="field-group-title">グループ/カテゴリー フィルター③</p>
-                                    <div class="grid-fields grid-fields--2">
-                                        <label class="field">
-                                            <span>対象列</span>
-                                            <select name="filter_column_3" id="filter-column-3-select">
-                                                <option value="">未設定</option>
-                                            </select>
-                                        </label>
-                                        <label class="field">
-                                            <span id="filter-value-3-label">値</span>
-                                            <select name="filter_value_3" id="filter-value-3-select" disabled>
-                                                <option value="">すべて</option>
-                                            </select>
-                                        </label>
-                                    </div>
-                                </section>
-                            </div>
-
-                            <p id="filter-selection-note" class="section-note">フィルターごとに対象列を設定すると、絞り込み値を選択できます。</p>
-
-                            <div class="analysis-target-label">分析対象</div>
-                            <div class="analysis-targets">
-                                {% for option in analysis_options %}
-                                <label class="target-check checked">
-                                    <input type="checkbox" name="analysis_keys" value="{{ option.key }}" checked>
-                                    <span>{{ option.label }}</span>
+                                <label class="field">
+                                    <span id="filter-group-title-1">追加フィルター 1</span>
+                                    <select name="filter_column_1" id="filter-column-1-select">
+                                        <option value="">未設定</option>
+                                    </select>
                                 </label>
-                                {% endfor %}
+                                <label class="field">
+                                    <span id="filter-value-1-label">値</span>
+                                    <select name="filter_value_1" id="filter-value-1-select" disabled>
+                                        <option value="">すべて</option>
+                                    </select>
+                                </label>
+                                <div class="dashboard-filter-actions">
+                                    <button type="button" id="reset-filter-button" class="hbtn">リセット</button>
+                                    <button type="submit" id="submit-button" class="run-btn">分析を実行</button>
+                                </div>
                             </div>
 
-                            <div class="panel-actions">
-                                <button type="submit" id="submit-button" class="run-btn">分析を実行</button>
-                                <p class="run-btn-hint">トップ画面では各分析の先頭 10 件を表示します。</p>
+                            <div class="dashboard-filter-row dashboard-filter-row--secondary">
+                                <label class="field">
+                                    <span id="filter-group-title-2">追加フィルター 2</span>
+                                    <select name="filter_column_2" id="filter-column-2-select">
+                                        <option value="">未設定</option>
+                                    </select>
+                                </label>
+                                <label class="field">
+                                    <span id="filter-value-2-label">値</span>
+                                    <select name="filter_value_2" id="filter-value-2-select" disabled>
+                                        <option value="">すべて</option>
+                                    </select>
+                                </label>
+                                <label class="field">
+                                    <span id="filter-group-title-3">追加フィルター 3</span>
+                                    <select name="filter_column_3" id="filter-column-3-select">
+                                        <option value="">未設定</option>
+                                    </select>
+                                </label>
+                                <label class="field">
+                                    <span id="filter-value-3-label">値</span>
+                                    <select name="filter_value_3" id="filter-value-3-select" disabled>
+                                        <option value="">すべて</option>
+                                    </select>
+                                </label>
+                            </div>
+
+                            <p id="filter-selection-note" class="section-note">分析対象条件ごとに対象列を設定すると、絞り込み値を選択できます。</p>
+
+                            <div class="analysis-target-strip">
+                                <div class="analysis-target-label">表示分析</div>
+                                <div class="analysis-targets">
+                                    {% for option in analysis_options %}
+                                    <label class="target-check checked">
+                                        <input type="checkbox" name="analysis_keys" value="{{ option.key }}" checked>
+                                        <span>{{ option.label }}</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -284,6 +289,7 @@
 
                 <section id="status-panel" class="status-panel hidden"></section>
                 <section id="summary-panel" class="summary-panel hidden"></section>
+                <section id="insight-panel" class="dashboard-insight hidden"></section>
                 <section id="result-panels" class="result-stack"></section>
             </div>
         </main>

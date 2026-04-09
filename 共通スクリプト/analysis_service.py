@@ -42,17 +42,17 @@ DEFAULT_ANALYSIS_KEYS = ["frequency", "transition", "pattern"]
 FLOW_FREQUENCY_ACTIVITY_COLUMN = "アクティビティ"
 FLOW_FREQUENCY_EVENT_COUNT_COLUMN = "イベント件数"
 FLOW_FREQUENCY_CASE_COUNT_COLUMN = "ケース数"
-FLOW_FREQUENCY_AVG_DURATION_COLUMN = "平均時間(分)"
+FLOW_FREQUENCY_AVG_DURATION_COLUMN = "平均処理時間(分)"
 FLOW_FREQUENCY_RATIO_COLUMN = "イベント比率(%)"
 FLOW_TRANSITION_FROM_COLUMN = "前処理アクティビティ名"
 FLOW_TRANSITION_TO_COLUMN = "後処理アクティビティ名"
 FLOW_TRANSITION_COUNT_COLUMN = "遷移件数"
-FLOW_TRANSITION_AVG_WAIT_COLUMN = "平均待ち時間(分)"
+FLOW_TRANSITION_AVG_WAIT_COLUMN = "平均所要時間(分)"
 FLOW_TRANSITION_RATIO_COLUMN = "遷移比率(%)"
 FLOW_PATTERN_CASE_COUNT_COLUMN = "ケース数"
 FLOW_PATTERN_COLUMN = "処理順パターン"
 FLOW_PATTERN_CASE_RATIO_COLUMN = "ケース比率(%)"
-FLOW_PATTERN_AVG_CASE_DURATION_COLUMN = "平均ケース時間(分)"
+FLOW_PATTERN_AVG_CASE_DURATION_COLUMN = "平均ケース処理時間(分)"
 FLOW_PATH_SEPARATOR = "→"
 FLOW_PATTERN_CAP = 500
 FLOW_LAYOUT_SWEEP_ITERATIONS = 4
@@ -88,7 +88,7 @@ def resolve_analysis_keys(selected_analysis_keys=None):
         analysis_keys = selected_analysis_keys
 
     if not analysis_keys:
-        raise ValueError("Please select at least one analysis key.")
+        raise ValueError("少なくとも1つの分析を選択してください。")
 
     return analysis_keys
 
@@ -117,20 +117,22 @@ def analyze_prepared_event_log(
     selected_analysis_keys=None,
     output_root_dir=None,
     export_excel=False,
+    group_columns=None,
 ):
     analysis_keys = resolve_analysis_keys(selected_analysis_keys)
     analysis_results = {}
 
     for analysis_key in analysis_keys:
         if analysis_key not in ANALYSIS_DEFINITIONS:
-            raise ValueError(f"Unsupported analysis key: {analysis_key}")
+            raise ValueError(f"未対応の分析種別です: {analysis_key}")
 
         definition = ANALYSIS_DEFINITIONS[analysis_key]
-        result_df = definition["create_function"](prepared_df)
+        result_df = definition["create_function"](prepared_df, group_columns=group_columns)
         analysis_config = definition["config"]
 
         excel_file = None
         if export_excel:
+            _group_summary = build_group_summary(prepared_df, group_columns) if group_columns else None
             excel_file = export_analysis_to_excel(
                 df=result_df,
                 output_root_dir=output_root_dir,
@@ -138,6 +140,8 @@ def analyze_prepared_event_log(
                 output_file_name=analysis_config["output_file_name"],
                 sheet_name=analysis_config["sheet_name"],
                 display_columns=analysis_config["display_columns"],
+                group_columns=group_columns,
+                group_summary=_group_summary,
             )
 
         analysis_results[analysis_key] = {
@@ -147,6 +151,7 @@ def analyze_prepared_event_log(
             "rows": convert_analysis_result_to_records(
                 result_df,
                 analysis_config["display_columns"],
+                group_columns=group_columns,
             ),
             "excel_file": str(excel_file.resolve()) if excel_file else None,
         }
@@ -154,17 +159,19 @@ def analyze_prepared_event_log(
     return {
         "case_count": int(prepared_df["case_id"].nunique()),
         "event_count": int(len(prepared_df)),
+        "group_columns": group_columns or [],
+        "group_mode": bool(group_columns),
         "analyses": analysis_results,
     }
 
 
 def create_analysis_records(prepared_df, analysis_key):
     if analysis_key not in ANALYSIS_DEFINITIONS:
-        raise ValueError(f"Unsupported analysis key: {analysis_key}")
+        raise ValueError(f"未対応の分析種別です: {analysis_key}")
 
     definition = ANALYSIS_DEFINITIONS[analysis_key]
     analysis_config = definition["config"]
-    result_df = definition["create_function"](prepared_df)
+    result_df = definition["create_function"](prepared_df, group_columns=None)
 
     return {
         "analysis_name": analysis_config["analysis_name"],
@@ -379,6 +386,194 @@ def _parse_filter_datetime(value, is_end=False):
         return parsed_value.normalize() + pd.Timedelta(days=1)
 
     return parsed_value
+
+
+def detect_group_columns(filter_params, filter_column_settings):
+    """
+    列が選択されているが値が未選択のスロットを「グルーピング軸」と判定する。
+    返却値: [列名, ...] （①→②→③の順序を保持）
+    """
+    normalized_filters = normalize_filter_params(**(filter_params or {}))
+    normalized_settings = normalize_filter_column_settings(**(filter_column_settings or {}))
+    group_columns = []
+    for slot in FILTER_SLOT_KEYS:
+        col = normalized_settings.get(slot, {}).get("column_name")
+        val = normalized_filters.get(slot)
+        if col and not val:  # 列あり・値なし → グループ軸
+            group_columns.append(col)
+    return group_columns
+
+
+def _build_case_duration_minutes(prepared_df):
+    if prepared_df.empty or "case_id" not in prepared_df.columns:
+        return pd.DataFrame(columns=["case_id", "case_duration_min"])
+
+    if "duration_sec" in prepared_df.columns:
+        case_duration_df = (
+            prepared_df.groupby("case_id", as_index=False)
+            .agg(case_duration_sec=("duration_sec", "sum"))
+        )
+        case_duration_df["case_duration_min"] = (
+            case_duration_df["case_duration_sec"].astype(float) / 60
+        ).round(2)
+        return case_duration_df[["case_id", "case_duration_min"]]
+
+    if {"start_time", "next_time"}.issubset(prepared_df.columns):
+        case_duration_df = (
+            prepared_df.groupby("case_id", as_index=False)
+            .agg(
+                start_time=("start_time", "min"),
+                end_time=("next_time", "max"),
+            )
+        )
+        case_duration_df["case_duration_min"] = (
+            (case_duration_df["end_time"] - case_duration_df["start_time"]).dt.total_seconds() / 60
+        ).round(2)
+        return case_duration_df[["case_id", "case_duration_min"]]
+
+    return pd.DataFrame(columns=["case_id", "case_duration_min"])
+
+
+def _build_case_group_value_table(prepared_df, column_name):
+    if prepared_df.empty or column_name not in prepared_df.columns:
+        return pd.DataFrame(columns=["case_id", "value"])
+
+    sort_columns = ["case_id"]
+    if "sequence_no" in prepared_df.columns:
+        sort_columns.append("sequence_no")
+    elif "timestamp" in prepared_df.columns:
+        sort_columns.append("timestamp")
+
+    case_value_df = prepared_df[["case_id", column_name, *sort_columns[1:]]].copy()
+    case_value_df = case_value_df.dropna(subset=[column_name])
+    if case_value_df.empty:
+        return pd.DataFrame(columns=["case_id", "value"])
+
+    case_value_df[column_name] = case_value_df[column_name].astype(str).str.strip()
+    case_value_df = case_value_df[case_value_df[column_name] != ""]
+    if case_value_df.empty:
+        return pd.DataFrame(columns=["case_id", "value"])
+
+    case_value_df = (
+        case_value_df.sort_values(sort_columns)
+        .drop_duplicates(subset=["case_id"], keep="first")
+        .rename(columns={column_name: "value"})
+    )
+    return case_value_df[["case_id", "value"]]
+
+
+def _round_optional(value):
+    if pd.isna(value):
+        return None
+    return round(float(value), 2)
+
+
+def build_group_summary(prepared_df, group_columns):
+    """
+    グループ列ごとの集計サマリーを生成する。
+    フロントエンドのKPIカード・タブ切り替えで使用。
+
+    返却値:
+    {
+        "__meta__": {
+            "total_case_count": int,
+            "total_event_count": int,
+            "avg_duration_min": float,
+            "median_duration_min": float,
+            "max_duration_min": float,
+            "total_duration_min": float,
+        },
+        "column_name": {
+            "value_1": {
+                "case_count": int,
+                "case_ratio_pct": float,
+                "event_count": int,
+                "event_ratio_pct": float,
+                "avg_duration_min": float,
+                "median_duration_min": float,
+                "max_duration_min": float,
+                "total_duration_min": float,
+            },
+            ...
+        }
+    }
+    """
+    if not group_columns:
+        return {}
+
+    total_case_count = int(prepared_df["case_id"].nunique()) if "case_id" in prepared_df.columns else 0
+    total_event_count = int(len(prepared_df))
+    case_duration_df = _build_case_duration_minutes(prepared_df)
+    case_duration_series = case_duration_df["case_duration_min"].astype(float) if not case_duration_df.empty else pd.Series(dtype=float)
+
+    summary = {}
+    valid_columns = []
+    for col in (group_columns or []):
+        if col not in prepared_df.columns:
+            continue
+        valid_columns.append(col)
+
+        event_counts_df = (
+            prepared_df.groupby(col)
+            .agg(
+                event_count=("activity", "count"),
+            )
+            .reset_index()
+            .rename(columns={col: "value"})
+        )
+
+        case_value_df = _build_case_group_value_table(prepared_df, col)
+        case_stats_df = pd.DataFrame(columns=["value", "case_count", "avg_duration_min", "median_duration_min", "max_duration_min", "total_duration_min"])
+        if not case_value_df.empty:
+            case_stats_df = (
+                case_value_df.merge(case_duration_df, on="case_id", how="left")
+                .groupby("value", as_index=False)
+                .agg(
+                    case_count=("case_id", "nunique"),
+                    avg_duration_min=("case_duration_min", "mean"),
+                    median_duration_min=("case_duration_min", "median"),
+                    max_duration_min=("case_duration_min", "max"),
+                    total_duration_min=("case_duration_min", "sum"),
+                )
+            )
+
+        grouped = event_counts_df.merge(case_stats_df, on="value", how="outer")
+        grouped["event_count"] = grouped["event_count"].fillna(0).astype(int)
+        grouped["case_count"] = grouped["case_count"].fillna(0).astype(int)
+        grouped["case_ratio_pct"] = (
+            grouped["case_count"] / total_case_count * 100
+        ).round(2) if total_case_count else 0.0
+        grouped["event_ratio_pct"] = (
+            grouped["event_count"] / total_event_count * 100
+        ).round(2) if total_event_count else 0.0
+
+        summary[col] = {}
+        for _, row in grouped.iterrows():
+            entry = {
+                "case_count": int(row["case_count"]),
+                "case_ratio_pct": float(row["case_ratio_pct"]),
+                "event_count": int(row["event_count"]),
+                "event_ratio_pct": float(row["event_ratio_pct"]),
+                "avg_duration_min": _round_optional(row.get("avg_duration_min")),
+                "median_duration_min": _round_optional(row.get("median_duration_min")),
+                "max_duration_min": _round_optional(row.get("max_duration_min")),
+                "total_duration_min": _round_optional(row.get("total_duration_min")),
+            }
+            summary[col][str(row["value"])] = entry
+
+    if not valid_columns:
+        return {}
+
+    summary["__meta__"] = {
+        "total_case_count": total_case_count,
+        "total_event_count": total_event_count,
+        "avg_duration_min": round(float(case_duration_series.mean()), 2) if not case_duration_series.empty else 0.0,
+        "median_duration_min": round(float(case_duration_series.median()), 2) if not case_duration_series.empty else 0.0,
+        "max_duration_min": round(float(case_duration_series.max()), 2) if not case_duration_series.empty else 0.0,
+        "total_duration_min": round(float(case_duration_series.sum()), 2) if not case_duration_series.empty else 0.0,
+    }
+
+    return summary
 
 
 def filter_prepared_df(prepared_df, filter_params=None, filter_column_settings=None):
@@ -1008,7 +1203,7 @@ def _append_insight(items, max_items, insight_id, text, source_keys):
 
 
 def _collect_attention_activities(prepared_df):
-    if prepared_df.empty or "activity" not in prepared_df.columns:
+    if prepared_df is None or prepared_df.empty or "activity" not in prepared_df.columns:
         return []
 
     activity_values = [
@@ -1039,7 +1234,7 @@ def _build_frequency_insights(items, analysis_rows, max_items):
         items,
         max_items,
         "top_activity",
-        f"最も件数が多い activity は「{top_activity}」で、{top_event_count:,} 件（全イベントの {top_ratio:.1f}%）を占めています。",
+        f"最も件数が多いアクティビティは「{top_activity}」で、{top_event_count:,} 件（全イベントの {top_ratio:.1f}%）を占めています。",
         ["analysis"],
     )
 
@@ -1048,7 +1243,7 @@ def _build_frequency_insights(items, analysis_rows, max_items):
         items,
         max_items,
         "event_distribution",
-        f"上位3 activity で全イベントの {top3_ratio:.1f}% を占めており、イベント分布の偏りを確認できます。",
+        f"上位3アクティビティで全イベントの {top3_ratio:.1f}% を占めており、イベント分布の偏りを確認できます。",
         ["analysis"],
     )
 
@@ -1057,7 +1252,7 @@ def _build_frequency_insights(items, analysis_rows, max_items):
             items,
             max_items,
             "activity_concentration",
-            f"「{top_activity}」への集中度が高く、単一 activity への依存が大きい構成です。",
+            f"「{top_activity}」への集中度が高く、単一アクティビティへの依存が大きい構成です。",
             ["analysis"],
         )
         return
@@ -1072,7 +1267,7 @@ def _build_frequency_insights(items, analysis_rows, max_items):
         items,
         max_items,
         "slowest_activity",
-        f"平均処理時間が最も長い activity は「{longest_activity}」で、平均 {longest_avg_duration:.2f} 分です。",
+        f"平均処理時間が最も長いアクティビティは「{longest_activity}」で、平均 {longest_avg_duration:.2f} 分です。",
         ["analysis"],
     )
 
@@ -1152,7 +1347,7 @@ def _build_transition_insights(items, analysis_rows, max_items):
             items,
             max_items,
             "slowest_transition_wait",
-            f"平均待ち時間が最も長い遷移は「{transition_label}」で、平均 {longest_wait_value:.2f} 分です。",
+            f"平均所要時間が最も長い遷移は「{transition_label}」で、平均 {longest_wait_value:.2f} 分です。",
             ["analysis"],
         )
 
@@ -1251,7 +1446,7 @@ def create_rule_based_insights(
     )
 
     if normalized_analysis_key == "frequency":
-        insights_payload["description"] = "頻度分析の上位 activity とイベント分布の偏りを要約しています。"
+        insights_payload["description"] = "頻度分析の上位アクティビティとイベント分布の偏りを要約しています。"
         _build_frequency_insights(insights_payload["items"], analysis_rows, safe_max_items)
     elif normalized_analysis_key == "transition":
         insights_payload["description"] = "前後処理分析から、ループ・差戻し・遷移の特徴を要約しています。"
@@ -1278,7 +1473,7 @@ def create_rule_based_insights(
                 "top_impact_transition",
                 (
                     f"改善インパクトが最大の遷移は「{str(top_impact_row['transition_label'])}」で、"
-                    f"平均待ち時間 {top_impact_row['avg_duration_text']}、"
+                    f"平均所要時間 {top_impact_row['avg_duration_text']}、"
                     f"{int(top_impact_row['case_count']):,} ケースに発生しています。"
                 ),
                 ["impact"],
@@ -1289,8 +1484,8 @@ def create_rule_based_insights(
                 safe_max_items,
                 "top_activity_bottleneck",
                 (
-                    f"平均待ち時間が最大の Activity bottleneck は「{top_activity_bottleneck['activity']}」で、"
-                    f"平均待ち時間 {_format_duration_text(top_activity_bottleneck['avg_duration_sec'])} です。"
+                    f"平均所要時間が最大のアクティビティボトルネックは「{top_activity_bottleneck['activity']}」で、"
+                    f"平均所要時間 {_format_duration_text(top_activity_bottleneck['avg_duration_sec'])} です。"
                 ),
                 ["bottleneck"],
             )
@@ -1300,9 +1495,9 @@ def create_rule_based_insights(
                 safe_max_items,
                 "top_transition_bottleneck",
                 (
-                    f"平均待ち時間が最大の Transition bottleneck は"
+                    f"平均所要時間が最大の遷移ボトルネックは"
                     f"「{top_transition_bottleneck['from_activity']} {FLOW_PATH_SEPARATOR} {top_transition_bottleneck['to_activity']}」で、"
-                    f"平均待ち時間 {_format_duration_text(top_transition_bottleneck['avg_duration_sec'])} です。"
+                    f"平均所要時間 {_format_duration_text(top_transition_bottleneck['avg_duration_sec'])} です。"
                 ),
                 ["bottleneck"],
             )
@@ -1312,7 +1507,7 @@ def create_rule_based_insights(
             insights_payload["items"],
             safe_max_items,
             "top10_variant_coverage",
-            f"上位10 Variant で全ケースの {float(resolved_dashboard_summary['top10_variant_coverage_pct']):.1f}% をカバーしています。",
+            f"上位10バリアントで全ケースの {float(resolved_dashboard_summary['top10_variant_coverage_pct']):.1f}% をカバーしています。",
             ["dashboard", "variant"],
         )
 
@@ -1325,7 +1520,7 @@ def create_rule_based_insights(
                 insights_payload["items"],
                 safe_max_items,
                 "attention_activities",
-                f"「{display_names}」{suffix} の activity が含まれており、差戻しや再提出が発生している可能性があります。",
+                f"「{display_names}」{suffix} のアクティビティが含まれており、差戻しや再提出が発生している可能性があります。",
                 ["prepared_df"],
             )
 
@@ -1465,7 +1660,7 @@ def create_activity_case_drilldown(
 def create_case_trace_details(prepared_df, case_id):
     normalized_case_id = str(case_id or "").strip()
     if not normalized_case_id:
-        raise ValueError("Case ID is required.")
+        raise ValueError("ケースIDが必要です。")
 
     case_df = prepared_df[prepared_df["case_id"] == normalized_case_id].copy()
     if case_df.empty:
@@ -1585,6 +1780,42 @@ def _build_selected_pattern_prepared_df(prepared_df, selected_pattern_rows):
         return prepared_df.iloc[0:0].copy()
 
     return prepared_df[prepared_df["case_id"].isin(selected_case_ids)].copy()
+
+
+def select_pattern_rows_for_flow(
+    pattern_rows,
+    pattern_percent=10,
+    pattern_count=None,
+    pattern_cap=FLOW_PATTERN_CAP,
+):
+    cap = max(0, int(pattern_cap or 0))
+    requested_pattern_percent = clamp_flow_percent(pattern_percent)
+    sorted_pattern_rows = sorted(
+        pattern_rows,
+        key=lambda row: (
+            -int(row.get(FLOW_PATTERN_CASE_COUNT_COLUMN) or 0),
+            str(row.get(FLOW_PATTERN_COLUMN) or ""),
+        ),
+    )
+    effective_pattern_count = min(len(sorted_pattern_rows), cap)
+    requested_pattern_count = None if pattern_count is None else max(0, int(pattern_count or 0))
+    if requested_pattern_count is None:
+        used_pattern_count = _calculate_flow_limit(
+            effective_pattern_count,
+            requested_pattern_percent,
+        )
+    else:
+        used_pattern_count = min(effective_pattern_count, requested_pattern_count)
+
+    return {
+        "requested_percent": requested_pattern_percent,
+        "requested_count": requested_pattern_count,
+        "total_pattern_count": len(sorted_pattern_rows),
+        "effective_pattern_count": effective_pattern_count,
+        "used_pattern_count": used_pattern_count,
+        "cap": cap,
+        "selected_pattern_rows": sorted_pattern_rows[:used_pattern_count],
+    }
 
 
 def _build_flow_graph(pattern_rows, transition_rows=None, frequency_rows=None):
@@ -2006,6 +2237,7 @@ def _apply_flow_layout(nodes, edges):
 def create_pattern_flow_snapshot(
     pattern_rows,
     prepared_df=None,
+    transition_rows=None,
     frequency_rows=None,
     pattern_percent=10,
     pattern_count=None,
@@ -2014,32 +2246,19 @@ def create_pattern_flow_snapshot(
     pattern_cap=FLOW_PATTERN_CAP,
 ):
     frequency_rows = frequency_rows or []
-    cap = max(0, int(pattern_cap or 0))
-    requested_pattern_percent = clamp_flow_percent(pattern_percent)
     requested_activity_percent = clamp_flow_percent(activity_percent)
     requested_connection_percent = clamp_flow_percent(connection_percent)
-    sorted_pattern_rows = sorted(
+    pattern_selection = select_pattern_rows_for_flow(
         pattern_rows,
-        key=lambda row: (
-            -int(row.get(FLOW_PATTERN_CASE_COUNT_COLUMN) or 0),
-            str(row.get(FLOW_PATTERN_COLUMN) or ""),
-        ),
+        pattern_percent=pattern_percent,
+        pattern_count=pattern_count,
+        pattern_cap=pattern_cap,
     )
-
-    effective_pattern_count = min(len(sorted_pattern_rows), cap)
-    requested_pattern_count = None if pattern_count is None else max(0, int(pattern_count or 0))
-    if requested_pattern_count is None:
-        used_pattern_count = _calculate_flow_limit(
-            effective_pattern_count,
-            requested_pattern_percent,
-        )
-    else:
-        used_pattern_count = min(effective_pattern_count, requested_pattern_count)
-    selected_pattern_rows = sorted_pattern_rows[:used_pattern_count]
+    selected_pattern_rows = pattern_selection["selected_pattern_rows"]
     selected_frequency_rows = list(frequency_rows or [])
-    selected_transition_rows = []
+    selected_transition_rows = list(transition_rows or [])
 
-    if prepared_df is not None:
+    if not selected_transition_rows and prepared_df is not None:
         selected_pattern_df = _build_selected_pattern_prepared_df(prepared_df, selected_pattern_rows)
         if selected_pattern_df is not None and not selected_pattern_df.empty:
             selected_transition_rows = convert_analysis_result_to_records(
@@ -2061,12 +2280,12 @@ def create_pattern_flow_snapshot(
 
     return {
         "pattern_window": {
-            "requested_percent": requested_pattern_percent,
-            "requested_count": requested_pattern_count,
-            "total_pattern_count": len(sorted_pattern_rows),
-            "effective_pattern_count": effective_pattern_count,
-            "used_pattern_count": used_pattern_count,
-            "cap": cap,
+            "requested_percent": pattern_selection["requested_percent"],
+            "requested_count": pattern_selection["requested_count"],
+            "total_pattern_count": pattern_selection["total_pattern_count"],
+            "effective_pattern_count": pattern_selection["effective_pattern_count"],
+            "used_pattern_count": pattern_selection["used_pattern_count"],
+            "cap": pattern_selection["cap"],
         },
         "activity_window": {
             "requested_percent": requested_activity_percent,
@@ -2094,7 +2313,7 @@ def create_variant_flow_snapshot(
     filtered_df = filter_prepared_df_by_pattern(prepared_df, variant_pattern)
 
     if filtered_df.empty:
-        raise ValueError("Variant was not found.")
+        raise ValueError("バリアントが見つかりません。")
 
     return create_pattern_flow_snapshot(
         pattern_rows=[
@@ -2106,8 +2325,8 @@ def create_variant_flow_snapshot(
         prepared_df=filtered_df,
         pattern_percent=100,
         pattern_count=1,
-        activity_percent=100,
-        connection_percent=100,
+        activity_percent=activity_percent,
+        connection_percent=connection_percent,
         pattern_cap=1,
     )
 
@@ -2116,7 +2335,7 @@ def create_pattern_bottleneck_details(prepared_df, pattern):
     pattern_df = filter_prepared_df_by_pattern(prepared_df, pattern)
 
     if pattern_df.empty:
-        raise ValueError("Pattern was not found.")
+        raise ValueError("パターンが見つかりません。")
 
     pattern_df = pattern_df.sort_values(["case_id", "sequence_no"]).copy()
     transition_df = build_duration_interval_table(pattern_df)
