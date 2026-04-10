@@ -24,12 +24,6 @@ from 共通スクリプト.analysis_core import (
     build_duration_interval_table,
     format_duration_text,
 )
-from 共通スクリプト.analysis_summary import (
-    create_bottleneck_summary,
-    create_dashboard_summary,
-    create_impact_summary,
-)
-
 
 # -----------------------------------------------------------------------------
 # Root cause, bottleneck, and case trace helpers
@@ -267,9 +261,15 @@ def create_rule_based_insights(
     max_items=5,
 ):
     safe_max_items = max(0, int(max_items or 0))
-    resolved_dashboard_summary = dashboard_summary or create_dashboard_summary(prepared_df)
-    resolved_bottleneck_summary = bottleneck_summary or create_bottleneck_summary(prepared_df, limit=10)
-    resolved_impact_summary = impact_summary or create_impact_summary(prepared_df, limit=10)
+    # pandas版 fallback を削除。summary は呼び出し元が必ず渡す前提。
+    resolved_dashboard_summary = dashboard_summary or {}
+    resolved_bottleneck_summary = bottleneck_summary or {
+        "activity_bottlenecks": [],
+        "transition_bottlenecks": [],
+        "activity_heatmap": {},
+        "transition_heatmap": {},
+    }
+    resolved_impact_summary = impact_summary or {"has_data": False, "rows": []}
     normalized_analysis_key = str(analysis_key or "").strip().lower()
     analysis_rows = list(analysis_rows or [])
     insights_payload = {
