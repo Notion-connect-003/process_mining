@@ -2,6 +2,13 @@ import duckdb
 import pandas as pd
 
 from 共通スクリプト.duckdb_core import *
+from 共通スクリプト.duckdb_core import (
+    _build_scoped_relation_cte,
+    _format_stddev_column,
+    _get_parquet_column_names,
+    _query_dataframe,
+    _quote_identifier,
+)
 
 
 def query_filtered_meta(parquet_path, filter_params=None, filter_column_settings=None, variant_pattern=None):
