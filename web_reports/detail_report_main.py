@@ -211,6 +211,15 @@ def _append_detail_export_ai_sheet(workbook, context):
         start_row=next_row,
         column_count=6,
     )
+    next_row = append_bullet_rows(
+        ai_sheet,
+        "推奨アクション",
+        context["ai_summary"].get("recommended_actions", []),
+        start_row=next_row,
+        column_count=6,
+        empty_text="推奨アクションはありません。",
+        section_header_fill=EXCEL_ASSUMPTION_SECTION_FILL,
+    )
     next_row = append_definition_table_to_worksheet(
         ai_sheet,
         "用語説明",

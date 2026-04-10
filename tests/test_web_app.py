@@ -332,6 +332,10 @@ class WebAppTestCase(unittest.TestCase):
                     "Submit が中心のルートです。",
                     "Approve の前後を重点確認してください。",
                 ],
+                "recommended_actions": [
+                    "Submit の前後処理を確認し、遷移パターンの改善ポイントを特定してください。",
+                    "Approve の処理時間をケース別にドリルダウンで確認してください。",
+                ],
                 "note": "ローカルLLMで生成した解説を掲載しています。",
             },
         ):
@@ -416,13 +420,20 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual("\u51e6\u7406\u9806\u30d1\u30bf\u30fc\u30f3\u5206\u6790", ai_sheet["B4"].value)
         analysis_premise_row = self.find_row_by_value(ai_sheet, "分析前提")
         explanation_row = self.find_row_by_value(ai_sheet, "解説本文")
+        recommended_actions_row = self.find_row_by_value(ai_sheet, "推奨アクション")
         terminology_row = self.find_row_by_value(ai_sheet, "用語説明")
         disclaimer_row = self.find_row_by_value(ai_sheet, "補足・免責事項")
         self.assertLess(analysis_premise_row, explanation_row)
-        self.assertLess(explanation_row, terminology_row)
+        self.assertLess(explanation_row, recommended_actions_row)
+        self.assertLess(recommended_actions_row, terminology_row)
         self.assertLess(terminology_row, disclaimer_row)
         self.assertIn("処理時間は、同一ケース内で", str(ai_sheet.cell(row=analysis_premise_row + 1, column=1).value))
         self.assertIn("テスト用の分析コメント", str(ai_sheet.cell(row=explanation_row + 2, column=1).value))
+        self.assertTrue(str(ai_sheet.cell(row=recommended_actions_row, column=1).fill.fgColor.rgb).endswith("E8EDF2"))
+        self.assertIn(
+            "Submit",
+            str(ai_sheet.cell(row=recommended_actions_row + 1, column=2).value or ""),
+        )
         self.assertEqual("用語", ai_sheet.cell(row=terminology_row + 1, column=1).value)
         self.assertEqual("説明", ai_sheet.cell(row=terminology_row + 1, column=2).value)
         self.assertEqual("ケース", ai_sheet.cell(row=terminology_row + 2, column=1).value)

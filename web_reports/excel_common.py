@@ -518,7 +518,7 @@ def append_key_value_rows(worksheet, title, rows, start_row=1, description=""):
     return current_row + 1
 
 
-def append_bullet_rows(worksheet, title, items, start_row=1, column_count=6, empty_text="表示できる要点がありません。"):
+def append_bullet_rows(worksheet, title, items, start_row=1, column_count=6, empty_text="表示できる要点がありません。", section_header_fill=None):
     current_row = start_row
     safe_column_count = max(2, int(column_count or 2))
     merge_excel_row(worksheet, current_row, safe_column_count)
@@ -526,7 +526,7 @@ def append_bullet_rows(worksheet, title, items, start_row=1, column_count=6, emp
     style_excel_cell(
         section_cell,
         font=EXCEL_BOLD_FONT,
-        fill=EXCEL_SECTION_FILL,
+        fill=section_header_fill or EXCEL_SECTION_FILL,
         alignment=Alignment(horizontal="left", vertical="center"),
         border=EXCEL_THIN_BORDER,
     )

@@ -119,7 +119,7 @@ def build_analysis_ai_prompt(ai_context):
 ## ルールベース要点
 {serialize_ai_prompt_rows([item.get('text', '') for item in ai_context['insights_summary'].get('items', [])], max_items=5)}
 
-## 回答形式（必ず以下の3セクションに分けて出力してください）
+## 回答形式（必ず以下の4セクションに分けて出力してください）
 
 【全体傾向】
 データ全体の傾向を2〜3文で要約してください。具体的な数値（ケース数、イベント数、イベント比率、平均処理時間など）を必ず引用してください。
@@ -130,8 +130,142 @@ def build_analysis_ai_prompt(ai_context):
 【ボトルネック示唆】
 処理時間・ばらつき・ボトルネックデータの観点からボトルネック候補を1〜2点示唆してください。現場で起こりやすい原因仮説を添え、詳細確認の推奨を含めてください。
 
+【推奨アクション】
+上記の分析結果を踏まえ、次に取るべきアクション・確認すべきポイントを1〜3点、箇条書き（「- 」で始める）で提示してください。
+具体的かつ実行可能なアクションにしてください。「○○を確認する」「○○の分析を実施する」のような形式で、分析結果に基づいた提案にしてください（一般論は避ける）。
+
 専門用語は使いすぎず、現場担当者が読みやすい自然な日本語で書いてください。
 """
+
+
+def extract_recommended_actions_from_text(text):
+    """LLM生成テキストから【推奨アクション】セクションを抽出し、(本文, アクションリスト) を返す。
+
+    【推奨アクション】マーカーが見つかった場合:
+      - マーカーより前のテキストを本文として返す
+      - マーカー以降のテキストを箇条書きとしてパースしリストで返す
+    マーカーが見つからない場合:
+      - テキスト全体を本文、空リストを返す
+    """
+    import re
+    normalized_text = str(text or "").strip()
+    if not normalized_text:
+        return "", []
+
+    pattern = re.compile(r"^【推奨アクション】\s*$", re.MULTILINE)
+    match = pattern.search(normalized_text)
+    if not match:
+        return normalized_text, []
+
+    main_text = normalized_text[: match.start()].rstrip()
+    actions_text = normalized_text[match.end() :].strip()
+
+    actions = []
+    for line in actions_text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # 「- 」「• 」「・ 」で始まる行
+        if stripped[0] in "-•・":
+            actions.append(stripped.lstrip("-•・ ").strip())
+        # 「1. 」「2. 」等の番号付き行
+        elif len(stripped) > 1 and stripped[0].isdigit() and stripped[1] in ".、)）":
+            actions.append(stripped[2:].strip())
+        # 「1) 」等の2桁番号にも対応
+        elif len(stripped) > 2 and stripped[:2].isdigit() and stripped[2] in ".、)）":
+            actions.append(stripped[3:].strip())
+        else:
+            # マーカー以降の非箇条書きテキストもアクションとして扱う
+            actions.append(stripped)
+
+    return main_text, [a for a in actions if a]
+
+
+def build_ai_recommended_actions(ai_context):
+    """分析データに基づいてルールベースの推奨アクションを生成する。
+
+    条件を上から順に判定し、該当するもの（最大3つ）を返す。
+    該当が0件の場合はデフォルト文を返す。
+    """
+    analysis_key = str(ai_context["analysis_key"]).strip().lower()
+    bottleneck_summary = ai_context["bottleneck_summary"]
+    analysis_rows = ai_context["analysis_rows"]
+    impact_summary = ai_context["impact_summary"]
+
+    top_activity_bottleneck = (
+        bottleneck_summary["activity_bottlenecks"][0]
+        if bottleneck_summary.get("activity_bottlenecks")
+        else None
+    )
+    top_transition_bottleneck = (
+        bottleneck_summary["transition_bottlenecks"][0]
+        if bottleneck_summary.get("transition_bottlenecks")
+        else None
+    )
+    top_impact_row = (
+        impact_summary["rows"][0] if impact_summary.get("rows") else None
+    )
+
+    actions = []
+
+    # 条件1: 処理時間の標準偏差が大きいアクティビティがある
+    if top_activity_bottleneck:
+        activity_name = top_activity_bottleneck.get("activity", "不明")
+        std_min = top_activity_bottleneck.get("std_duration_min", 0)
+        avg_min = top_activity_bottleneck.get("avg_duration_min", 0)
+        if std_min and avg_min and float(std_min) > float(avg_min) * 0.5:
+            actions.append(
+                f"「{activity_name}」の処理時間にばらつきがあります。"
+                f"ケースごとのドリルダウンで原因を確認することを推奨します。"
+            )
+
+    # 条件2: 上位3アクティビティのカバー率が80%以上（frequency分析時）
+    if analysis_key == "frequency" and len(analysis_rows) >= 3:
+        top3_ratio_sum = sum(
+            float(row.get("イベント比率(%)", 0) or 0)
+            for row in analysis_rows[:3]
+        )
+        if top3_ratio_sum >= 80:
+            actions.append(
+                "上位アクティビティへの集中度が高いため、"
+                "これらの効率化が全体改善に直結します。"
+                "前後処理分析で遷移パターンを確認してください。"
+            )
+
+    # 条件3: 平均処理時間が突出しているアクティビティがある
+    if top_activity_bottleneck:
+        activity_name = top_activity_bottleneck.get("activity", "不明")
+        avg_min = float(top_activity_bottleneck.get("avg_duration_min", 0) or 0)
+        dashboard_avg_text = ai_context["dashboard_summary"].get(
+            "avg_case_duration_min", 0
+        )
+        dashboard_avg = float(dashboard_avg_text or 0)
+        if dashboard_avg > 0 and avg_min >= dashboard_avg * 3:
+            actions.append(
+                f"「{activity_name}」の処理時間が突出しています。"
+                f"当該アクティビティのケース明細を確認し、"
+                f"外れ値や特殊ケースの有無を調査してください。"
+            )
+
+    # 条件4: 改善インパクトが高い遷移がある（transition / その他分析時）
+    if top_impact_row and analysis_key != "frequency":
+        transition_label = top_impact_row.get("transition_label", "不明")
+        actions.append(
+            f"改善インパクトが高い遷移「{transition_label}」を優先して、"
+            f"承認待ち・差戻し等の内訳を確認してください。"
+        )
+
+    # 最大3つに制限
+    actions = actions[:3]
+
+    # デフォルト: 該当なしの場合
+    if not actions:
+        actions.append(
+            "前後処理分析やバリアント分析で、"
+            "プロセス全体の流れを確認することを推奨します。"
+        )
+
+    return actions
 
 
 def build_ai_fallback_text(ai_context):
@@ -348,6 +482,7 @@ def build_empty_ai_summary(analysis_key, analysis_name):
         "period": "",
         "text": "",
         "highlights": [],
+        "recommended_actions": [],
         "note": "まだ生成していません。現在の分析条件に対する分析コメントを生成すると、画面を切り替えても保持されます。",
     }
 
@@ -535,6 +670,7 @@ def build_ai_insights_summary(
     fallback_text = build_ai_fallback_text(ai_context)
 
     if not ai_context["dashboard_summary"].get("has_data"):
+        fallback_actions = build_ai_recommended_actions(ai_context)
         payload = {
             "title": REPORT_SHEET_NAMES["ai_insights"],
             "analysis_key": ai_context["analysis_key"],
@@ -547,6 +683,7 @@ def build_ai_insights_summary(
             "highlights": [
                 item["text"] for item in ai_context["insights_summary"].get("items", [])
             ],
+            "recommended_actions": fallback_actions,
             "note": "対象データがないため、既存集計からの要約のみを表示しています。",
         }
         if use_cache:
@@ -562,6 +699,10 @@ def build_ai_insights_summary(
     try:
         ai_text = request_ai_text(build_analysis_ai_prompt(ai_context))
         if ai_text:
+            main_text, llm_actions = extract_recommended_actions_from_text(ai_text)
+            # LLMが推奨アクションを生成できなかった場合はルールベースで補完
+            if not llm_actions:
+                llm_actions = build_ai_recommended_actions(ai_context)
             payload = {
                 "title": REPORT_SHEET_NAMES["ai_insights"],
                 "analysis_key": ai_context["analysis_key"],
@@ -570,11 +711,12 @@ def build_ai_insights_summary(
                 "provider": "",
                 "generated_at": generated_at,
                 "period": ai_context["period_text"],
-                "text": ai_text,
+                "text": main_text,
                 "highlights": [
                     item["text"]
                     for item in ai_context["insights_summary"].get("items", [])
                 ],
+                "recommended_actions": llm_actions,
                 "note": "現在の分析条件に対応する分析コメントを保存しました。画面を切り替えても同じ条件なら再表示されます。",
             }
             if use_cache:
@@ -593,6 +735,7 @@ def build_ai_insights_summary(
     else:
         error_message = "分析コメントを生成できなかったため、ルールベース要約を掲載しています。"
 
+    fallback_actions = build_ai_recommended_actions(ai_context)
     payload = {
         "title": REPORT_SHEET_NAMES["ai_insights"],
         "analysis_key": ai_context["analysis_key"],
@@ -603,6 +746,7 @@ def build_ai_insights_summary(
         "period": ai_context["period_text"],
         "text": fallback_text,
         "highlights": [item["text"] for item in ai_context["insights_summary"].get("items", [])],
+        "recommended_actions": fallback_actions,
         "note": error_message,
     }
     if use_cache:
