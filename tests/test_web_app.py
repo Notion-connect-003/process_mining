@@ -441,6 +441,12 @@ class WebAppTestCase(unittest.TestCase):
         self.assertTrue(str(ai_sheet.cell(row=analysis_premise_row, column=1).fill.fgColor.rgb).endswith("E8EDF2"))
         self.assertTrue(str(ai_sheet.cell(row=terminology_row, column=1).fill.fgColor.rgb).endswith("F0F0F0"))
         self.assertTrue(str(ai_sheet.cell(row=disclaimer_row, column=1).fill.fgColor.rgb).endswith("F0F0F0"))
+        self.assertTrue(
+            str(ai_sheet.cell(row=terminology_row + 2, column=1).fill.fgColor.rgb).endswith("F7F7F7")
+        )
+        self.assertTrue(
+            str(ai_sheet.cell(row=terminology_row + 2, column=1).border.left.color.rgb).endswith("D0D0D0")
+        )
         self.assertNotIn("\u983b\u5ea6\u5206\u6790", workbook.sheetnames)
         self.assertNotIn("\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u5206\u6790", workbook.sheetnames)
         self.assertNotIn("\u6539\u5584\u30a4\u30f3\u30d1\u30af\u30c8\u5206\u6790", workbook.sheetnames)

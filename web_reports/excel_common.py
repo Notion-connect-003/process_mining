@@ -172,6 +172,14 @@ EXCEL_NOTE_FONT = Font(size=9, color="5B6B82")
 EXCEL_BODY_FONT = Font(size=10, color="1F2937")
 EXCEL_BOLD_FONT = Font(bold=True, size=10, color="1F2937")
 EXCEL_GROUP_SECTION_FONT = Font(bold=True, size=12, color="1F2937")
+EXCEL_SECTION_HEADER_FONT = Font(bold=True, size=11, color="1F2937")
+EXCEL_TERMINOLOGY_FILL = PatternFill(fill_type="solid", fgColor="F7F7F7")
+EXCEL_TERMINOLOGY_BORDER = Border(
+    left=Side(style="thin", color="D0D0D0"),
+    right=Side(style="thin", color="D0D0D0"),
+    top=Side(style="thin", color="D0D0D0"),
+    bottom=Side(style="thin", color="D0D0D0"),
+)
 
 
 def sanitize_workbook_sheet_name(sheet_name):
@@ -525,7 +533,7 @@ def append_bullet_rows(worksheet, title, items, start_row=1, column_count=6, emp
     section_cell = worksheet.cell(row=current_row, column=1, value=title)
     style_excel_cell(
         section_cell,
-        font=EXCEL_BOLD_FONT,
+        font=EXCEL_SECTION_HEADER_FONT,
         fill=section_header_fill or EXCEL_SECTION_FILL,
         alignment=Alignment(horizontal="left", vertical="center"),
         border=EXCEL_THIN_BORDER,
@@ -621,7 +629,7 @@ def append_custom_text_section_to_worksheet(
     section_cell = worksheet.cell(row=current_row, column=1, value=title)
     style_excel_cell(
         section_cell,
-        font=EXCEL_BOLD_FONT,
+        font=EXCEL_SECTION_HEADER_FONT,
         fill=header_fill or EXCEL_SECTION_FILL,
         alignment=Alignment(horizontal="left", vertical="center"),
         border=EXCEL_THIN_BORDER,
@@ -659,7 +667,7 @@ def append_definition_table_to_worksheet(worksheet, title, rows, start_row=1, co
     section_cell = worksheet.cell(row=current_row, column=1, value=title)
     style_excel_cell(
         section_cell,
-        font=EXCEL_BOLD_FONT,
+        font=EXCEL_SECTION_HEADER_FONT,
         fill=header_fill or EXCEL_MUTED_SECTION_FILL,
         alignment=Alignment(horizontal="left", vertical="center"),
         border=EXCEL_THIN_BORDER,
@@ -681,22 +689,21 @@ def append_definition_table_to_worksheet(worksheet, title, rows, start_row=1, co
     current_row += 1
 
     for row_index, row in enumerate(rows or [], start=0):
-        fill = EXCEL_ALT_ROW_FILL if row_index % 2 else None
         term_cell = worksheet.cell(row=current_row, column=1, value=normalize_excel_cell_value(row.get("用語")))
         description_cell = worksheet.cell(row=current_row, column=2, value=normalize_excel_cell_value(row.get("説明")))
         style_excel_cell(
             term_cell,
             font=EXCEL_BOLD_FONT,
-            fill=EXCEL_LABEL_FILL if fill is None else fill,
+            fill=EXCEL_TERMINOLOGY_FILL,
             alignment=Alignment(wrap_text=True, vertical="top"),
-            border=EXCEL_THIN_BORDER,
+            border=EXCEL_TERMINOLOGY_BORDER,
         )
         style_excel_cell(
             description_cell,
             font=EXCEL_BODY_FONT,
-            fill=fill,
+            fill=EXCEL_TERMINOLOGY_FILL,
             alignment=Alignment(wrap_text=True, vertical="top"),
-            border=EXCEL_THIN_BORDER,
+            border=EXCEL_TERMINOLOGY_BORDER,
         )
         worksheet.row_dimensions[current_row].height = max(
             20,
@@ -705,6 +712,58 @@ def append_definition_table_to_worksheet(worksheet, title, rows, start_row=1, co
         current_row += 1
 
     return current_row + 1
+
+
+def build_rich_text_with_bold_numbers(text, base_color="1F2937", base_size=10):
+    """テキスト内の数値・数値+単位を太字にした CellRichText を返す。
+
+    数値が含まれない場合は元のテキスト文字列をそのまま返す。
+    """
+    import re
+    from openpyxl.cell.rich_text import CellRichText, TextBlock
+    from openpyxl.cell.text import InlineFont
+
+    safe_text = str(text or "").strip()
+    if not safe_text:
+        return safe_text
+
+    # 数値パターン: 数字で始まり、カンマ・ピリオド・数字が続く部分 + 直後の単位文字
+    number_pattern = re.compile(
+        r"(\d[\d,.]*\d?)"
+        r"(%|件|分|秒|時間|日|月|年|回|個|ケース|イベント|種類|パターン|s|ms|min|h)?"
+    )
+
+    # 分割: マッチ部分とそれ以外に分ける
+    parts = []
+    last_end = 0
+    for match in number_pattern.finditer(safe_text):
+        if match.start() > last_end:
+            parts.append(("text", safe_text[last_end : match.start()]))
+        parts.append(("number", match.group(0)))
+        last_end = match.end()
+    if last_end < len(safe_text):
+        parts.append(("text", safe_text[last_end:]))
+
+    # 数値が見つからなかった場合はそのまま返す
+    if not any(kind == "number" for kind, _ in parts):
+        return safe_text
+
+    normal_font = InlineFont(sz=base_size, color=base_color)
+    bold_font = InlineFont(b=True, sz=base_size, color=base_color)
+
+    rich_parts = []
+    for kind, value in parts:
+        if not value:
+            continue
+        if kind == "number":
+            rich_parts.append(TextBlock(bold_font, value))
+        else:
+            rich_parts.append(TextBlock(normal_font, value))
+
+    if not rich_parts:
+        return safe_text
+
+    return CellRichText(*rich_parts)
 
 
 def append_structured_text_block_to_worksheet(
@@ -733,7 +792,7 @@ def append_structured_text_block_to_worksheet(
     title_cell = worksheet.cell(row=current_row, column=1, value=section_title)
     style_excel_cell(
         title_cell,
-        font=EXCEL_BOLD_FONT,
+        font=EXCEL_SECTION_HEADER_FONT,
         fill=header_fill,
         alignment=Alignment(horizontal="left", vertical="center"),
         border=EXCEL_THIN_BORDER,
@@ -768,7 +827,9 @@ def append_structured_text_block_to_worksheet(
     if len(parts) <= 1:
         # マーカーなし: 従来通り1ブロックで出力
         merge_excel_row(worksheet, current_row, safe_column_count)
-        text_cell = worksheet.cell(row=current_row, column=1, value=normalized_text)
+        text_cell = worksheet.cell(
+            row=current_row, column=1, value=build_rich_text_with_bold_numbers(normalized_text)
+        )
         style_excel_cell(
             text_cell,
             font=EXCEL_BODY_FONT,
@@ -785,7 +846,9 @@ def append_structured_text_block_to_worksheet(
     preamble = parts[0].strip()
     if preamble:
         merge_excel_row(worksheet, current_row, safe_column_count)
-        preamble_cell = worksheet.cell(row=current_row, column=1, value=preamble)
+        preamble_cell = worksheet.cell(
+            row=current_row, column=1, value=build_rich_text_with_bold_numbers(preamble)
+        )
         style_excel_cell(
             preamble_cell,
             font=EXCEL_BODY_FONT,
@@ -822,7 +885,7 @@ def append_structured_text_block_to_worksheet(
         if subsection_body:
             merge_excel_row(worksheet, current_row, safe_column_count)
             body_cell = worksheet.cell(
-                row=current_row, column=1, value=subsection_body
+                row=current_row, column=1, value=build_rich_text_with_bold_numbers(subsection_body)
             )
             style_excel_cell(
                 body_cell,

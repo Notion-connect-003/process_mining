@@ -183,6 +183,13 @@ def _append_detail_export_summary_sheet(
         description="グルーピング条件ごとのケース数・処理時間の比較です。",
     )
 
+def _insert_spacer_row(worksheet, row_index, column_count=6, height=8):
+    """セクション間に空のスペーサー行を挿入する。"""
+    merge_excel_row(worksheet, row_index, column_count)
+    worksheet.row_dimensions[row_index].height = height
+    return row_index + 1
+
+
 def _append_detail_export_ai_sheet(workbook, context):
     ai_sheet = _create_report_sheet(workbook, REPORT_SHEET_NAMES["ai_insights"])
     ai_meta_rows = [
@@ -196,6 +203,7 @@ def _append_detail_export_ai_sheet(workbook, context):
         ai_meta_rows,
         description="現在の分析条件に対応する分析コメント、または既存集計からの要約を掲載します。",
     )
+    next_row = _insert_spacer_row(ai_sheet, next_row)
     next_row = append_custom_text_section_to_worksheet(
         ai_sheet,
         "分析前提",
@@ -204,6 +212,7 @@ def _append_detail_export_ai_sheet(workbook, context):
         column_count=6,
         header_fill=EXCEL_ASSUMPTION_SECTION_FILL,
     )
+    next_row = _insert_spacer_row(ai_sheet, next_row)
     next_row = append_structured_text_block_to_worksheet(
         ai_sheet,
         "解説本文",
@@ -211,6 +220,7 @@ def _append_detail_export_ai_sheet(workbook, context):
         start_row=next_row,
         column_count=6,
     )
+    next_row = _insert_spacer_row(ai_sheet, next_row)
     next_row = append_bullet_rows(
         ai_sheet,
         "推奨アクション",
@@ -220,6 +230,7 @@ def _append_detail_export_ai_sheet(workbook, context):
         empty_text="推奨アクションはありません。",
         section_header_fill=EXCEL_ASSUMPTION_SECTION_FILL,
     )
+    next_row = _insert_spacer_row(ai_sheet, next_row)
     next_row = append_definition_table_to_worksheet(
         ai_sheet,
         "用語説明",
@@ -228,6 +239,7 @@ def _append_detail_export_ai_sheet(workbook, context):
         column_count=6,
         header_fill=EXCEL_MUTED_SECTION_FILL,
     )
+    next_row = _insert_spacer_row(ai_sheet, next_row)
     append_custom_text_section_to_worksheet(
         ai_sheet,
         "補足・免責事項",
@@ -237,6 +249,10 @@ def _append_detail_export_ai_sheet(workbook, context):
         header_fill=EXCEL_MUTED_SECTION_FILL,
         body_fill=EXCEL_LABEL_FILL,
     )
+    ai_sheet.column_dimensions["A"].width = 18
+    ai_sheet.column_dimensions["B"].width = 50
+    for col_letter in ["C", "D", "E", "F"]:
+        ai_sheet.column_dimensions[col_letter].width = 12
 
 def _append_frequency_export_sheet(workbook, context, run_data, filter_params):
     frequency_sheet = _create_report_sheet(workbook, REPORT_SHEET_NAMES["frequency"])
