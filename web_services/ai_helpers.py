@@ -119,21 +119,16 @@ def build_analysis_ai_prompt(ai_context):
 ## ルールベース要点
 {serialize_ai_prompt_rows([item.get('text', '') for item in ai_context['insights_summary'].get('items', [])], max_items=5)}
 
-## 回答形式
-【1. 全体サマリー】
-2〜3文で全体像を要約してください。
+## 回答形式（必ず以下の3セクションに分けて出力してください）
 
-【2. この分析で読むべきポイント】
-この分析ならではの見方で、重要点を2つ説明してください。
+【全体傾向】
+データ全体の傾向を2〜3文で要約してください。具体的な数値（ケース数、イベント数、イベント比率、平均処理時間など）を必ず引用してください。
 
-【3. 考えられる原因】
-現場で起こりやすい原因を2〜3つ挙げてください。
+【注目ポイント】
+この分析で特に注目すべきアクティビティや遷移を2〜3点ピックアップし、数値を交えて考察してください。なぜそれが注目に値するのか（高頻度、長時間、高ばらつき等）を明記してください。
 
-【4. 改善アクション】
-すぐできることを1つ、中期的な改善を1つ提案してください。
-
-【5. 次に見るべきこと】
-次に確認すべき切り口を1つ提案してください。
+【ボトルネック示唆】
+処理時間・ばらつき・ボトルネックデータの観点からボトルネック候補を1〜2点示唆してください。現場で起こりやすい原因仮説を添え、詳細確認の推奨を含めてください。
 
 専門用語は使いすぎず、現場担当者が読みやすい自然な日本語で書いてください。
 """
@@ -144,7 +139,6 @@ def build_ai_fallback_text(ai_context):
     analysis_name = ai_context["analysis_name"]
     dashboard_summary = ai_context["dashboard_summary"]
     period_text = ai_context["period_text"]
-    insights_summary = ai_context["insights_summary"]
     impact_summary = ai_context["impact_summary"]
     bottleneck_summary = ai_context["bottleneck_summary"]
     analysis_rows = ai_context["analysis_rows"]
@@ -165,94 +159,178 @@ def build_ai_fallback_text(ai_context):
     )
     top_row = analysis_rows[0] if analysis_rows else {}
 
-    highlight_lines = [f"- {item['text']}" for item in insights_summary.get("items", [])]
-    if not highlight_lines:
-        highlight_lines.append("- 既存集計から明確なハイライトを抽出できませんでした。")
-
     if analysis_key == "frequency":
-        priority_text = (
-            f"件数の中心は「{top_row.get('アクティビティ', '不明')}」で、"
-            f"{normalize_excel_cell_value(top_row.get('イベント件数', 0))} 件です。"
-            if top_row
-            else "件数集中の中心アクティビティは特定できませんでした。"
-        )
-        action_lines = [
-            (
-                f"件数が集中する「{top_row.get('アクティビティ', '対象アクティビティ')}」について、"
-                "受付経路や担当者別件数を比較してください。"
-            ),
-            (
-                f"平均所要時間が長い「{top_activity_bottleneck['activity']}」の前後で、"
-                "入力不備や差戻しが発生していないか確認してください。"
-                if top_activity_bottleneck
-                else "上位アクティビティの担当別処理時間を比較してください。"
-            ),
-        ]
+        # 全体傾向
+        if top_row:
+            overall_trend_text = (
+                f"最も頻度の高いアクティビティは「{top_row.get('アクティビティ', '不明')}」"
+                f"（{normalize_excel_cell_value(top_row.get('イベント件数', 0))} 件、"
+                f"イベント比率 {normalize_excel_cell_value(top_row.get('イベント比率(%)', 0))}%）です。"
+            )
+        else:
+            overall_trend_text = "件数集中の中心アクティビティは特定できませんでした。"
+
+        # 注目ポイント
+        attention_lines = []
+        if top_row:
+            attention_lines.append(
+                f"- 「{top_row.get('アクティビティ', '不明')}」に件数が集中しており、"
+                f"受付経路や担当者別件数の比較を推奨します。"
+            )
+        if top_activity_bottleneck:
+            attention_lines.append(
+                f"- 「{top_activity_bottleneck['activity']}」は平均処理時間が長く、"
+                f"処理時間のばらつきにも注意が必要です。"
+            )
+        if not attention_lines:
+            attention_lines.append("- 特に注目すべきアクティビティは検出されませんでした。")
+
+        # ボトルネック示唆
+        bottleneck_lines = []
+        if top_activity_bottleneck:
+            bottleneck_lines.append(
+                f"- アクティビティ「{top_activity_bottleneck['activity']}」が"
+                f"処理時間の観点でボトルネック候補です。"
+                f"前後の入力不備や差戻しが原因の可能性があります。"
+            )
+        if top_transition_bottleneck_label:
+            bottleneck_lines.append(
+                f"- 遷移「{top_transition_bottleneck_label}」も滞留が見られます。"
+                f"ケースごとのドリルダウンでの確認を推奨します。"
+            )
+        if not bottleneck_lines:
+            bottleneck_lines.append(
+                "- 明確なボトルネックは検出されませんでした。"
+                "前後処理分析での確認を推奨します。"
+            )
+
     elif analysis_key == "transition":
-        priority_text = (
-            f"最も優先度が高い遷移候補は「{top_transition_bottleneck_label}」です。"
-            if top_transition_bottleneck_label
-            else "優先度が高い遷移候補は特定できませんでした。"
-        )
-        action_lines = [
-            (
-                f"「{top_transition_bottleneck_label}」の前後で、承認待ちや引き継ぎ待ちの内訳を確認してください。"
-                if top_transition_bottleneck_label
-                else "遷移単位で担当待ちの内訳を確認してください。"
-            ),
-            (
-                f"改善インパクトが高い「{top_impact_row['transition_label']}」から先に改善対象を絞ってください。"
-                if top_impact_row
-                else "差戻しや再提出を含む遷移を優先して確認してください。"
-            ),
-        ]
+        # 全体傾向
+        if top_transition_bottleneck_label:
+            overall_trend_text = (
+                f"最も優先度が高い遷移候補は「{top_transition_bottleneck_label}」です。"
+            )
+        else:
+            overall_trend_text = "優先度が高い遷移候補は特定できませんでした。"
+
+        # 注目ポイント
+        attention_lines = []
+        if top_transition_bottleneck_label:
+            attention_lines.append(
+                f"- 「{top_transition_bottleneck_label}」の前後で、"
+                f"承認待ちや引き継ぎ待ちの内訳に注目してください。"
+            )
+        if top_impact_row:
+            attention_lines.append(
+                f"- 改善インパクトが高い「{top_impact_row['transition_label']}」は"
+                f"優先的な改善対象です。"
+            )
+        if not attention_lines:
+            attention_lines.append("- 特に注目すべき遷移は検出されませんでした。")
+
+        # ボトルネック示唆
+        bottleneck_lines = []
+        if top_transition_bottleneck_label:
+            bottleneck_lines.append(
+                f"- 遷移「{top_transition_bottleneck_label}」が滞留のボトルネック候補です。"
+                f"承認待ち・バッチ処理・手作業の受け渡しが原因の可能性があります。"
+            )
+        if top_impact_row:
+            bottleneck_lines.append(
+                f"- 改善インパクト分析では「{top_impact_row['transition_label']}」が上位です。"
+                f"差戻しや再提出を含む遷移を優先して確認してください。"
+            )
+        if not bottleneck_lines:
+            bottleneck_lines.append(
+                "- 明確なボトルネック遷移は検出されませんでした。"
+                "パターン分析での確認を推奨します。"
+            )
+
     elif analysis_key == "pattern":
-        priority_text = (
-            f"最頻出パターンは「{top_row.get('処理順パターン', top_row.get('パターン', '不明'))}」です。"
-            if top_row
-            else "標準ルートは特定できませんでした。"
-        )
-        action_lines = [
-            "最頻出パターンと時間が長い例外パターンを比較し、分岐条件を整理してください。",
-            "差戻しや再提出を含むパターンを優先して、標準ルートへ寄せられるか確認してください。",
+        # 全体傾向
+        if top_row:
+            overall_trend_text = (
+                f"最頻出パターンは「{top_row.get('処理順パターン', top_row.get('パターン', '不明'))}」です。"
+            )
+        else:
+            overall_trend_text = "標準ルートは特定できませんでした。"
+
+        # 注目ポイント
+        attention_lines = [
+            "- 最頻出パターンと時間が長い例外パターンを比較し、分岐条件を整理してください。",
+            "- 差戻しや再提出を含むパターンは、標準ルートへ寄せられるか確認を推奨します。",
         ]
+
+        # ボトルネック示唆
+        bottleneck_lines = []
+        if top_activity_bottleneck:
+            bottleneck_lines.append(
+                f"- アクティビティ「{top_activity_bottleneck['activity']}」が"
+                f"例外パターンのボトルネック候補です。"
+            )
+        bottleneck_lines.append(
+            "- 繰り返し率が高いパターンは手戻りが多く、"
+            "一次判定や入力チェックの前倒しを検討してください。"
+        )
+
     else:
-        priority_text = (
-            f"改善インパクト最大の遷移は「{top_impact_row['transition_label']}」で、平均所要時間は {top_impact_row['avg_duration_text']} です。"
-            if top_impact_row
-            else "改善インパクト上位の遷移は検出されませんでした。"
-        )
-        action_lines = [
-            (
-                f"「{top_transition_bottleneck_label}」の前後で、担当待ち・承認待ち・差戻し理由の内訳を確認してください。"
-                if top_transition_bottleneck_label
-                else "上位パターンと例外パターンを比較し、どこで処理が分岐しているかを確認してください。"
-            ),
-            (
-                f"アクティビティ「{top_activity_bottleneck['activity']}」について、担当者別の件数と平均所要時間を比較してください。"
-                if top_activity_bottleneck
-                else "改善インパクトが高い遷移を優先して、滞留の主因を確認してください。"
-            ),
-        ]
+        # 全体傾向
+        if top_impact_row:
+            overall_trend_text = (
+                f"改善インパクト最大の遷移は「{top_impact_row['transition_label']}」で、"
+                f"平均所要時間は {top_impact_row['avg_duration_text']} です。"
+            )
+        else:
+            overall_trend_text = "改善インパクト上位の遷移は検出されませんでした。"
+
+        # 注目ポイント
+        attention_lines = []
+        if top_transition_bottleneck_label:
+            attention_lines.append(
+                f"- 「{top_transition_bottleneck_label}」の前後で、"
+                f"担当待ち・承認待ち・差戻し理由の内訳を確認してください。"
+            )
+        if top_activity_bottleneck:
+            attention_lines.append(
+                f"- アクティビティ「{top_activity_bottleneck['activity']}」について、"
+                f"担当者別の件数と平均所要時間を比較してください。"
+            )
+        if not attention_lines:
+            attention_lines.append(
+                "- 上位パターンと例外パターンを比較し、分岐ポイントを確認してください。"
+            )
+
+        # ボトルネック示唆
+        bottleneck_lines = []
+        if top_transition_bottleneck_label:
+            bottleneck_lines.append(
+                f"- 遷移「{top_transition_bottleneck_label}」が滞留のボトルネック候補です。"
+            )
+        if top_activity_bottleneck:
+            bottleneck_lines.append(
+                f"- アクティビティ「{top_activity_bottleneck['activity']}」も処理時間が長く注意が必要です。"
+            )
+        if not bottleneck_lines:
+            bottleneck_lines.append(
+                "- 改善インパクトが高い遷移を優先して、滞留の主因を確認してください。"
+            )
 
     return "\n".join(
         [
-            "【全体サマリー】",
+            "【全体傾向】",
             (
                 f"{analysis_name} を中心に確認すると、対象は "
                 f"{int(dashboard_summary.get('total_cases', 0)):,} ケース / "
                 f"{int(dashboard_summary.get('total_records', 0)):,} イベントです。"
             ),
             f"分析期間は {period_text} です。",
+            overall_trend_text,
             "",
-            "【重要ポイント】",
-            *highlight_lines,
+            "【注目ポイント】",
+            *attention_lines,
             "",
-            "【この分析で優先して見るべき点】",
-            priority_text,
-            "",
-            "【次のアクション】",
-            *[f"- {action_line}" for action_line in action_lines[:2]],
+            "【ボトルネック示唆】",
+            *bottleneck_lines,
         ]
     )
 

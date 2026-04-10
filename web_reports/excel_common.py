@@ -705,3 +705,135 @@ def append_definition_table_to_worksheet(worksheet, title, rows, start_row=1, co
         current_row += 1
 
     return current_row + 1
+
+
+def append_structured_text_block_to_worksheet(
+    worksheet,
+    section_title,
+    full_text,
+    start_row=1,
+    column_count=6,
+    section_header_fill=None,
+    subsection_marker_start="【",
+    subsection_marker_end="】",
+):
+    """解説本文を【】マーカーでサブセクションに分割し、小見出し付きで出力する。
+
+    【全体傾向】【注目ポイント】【ボトルネック示唆】のようなマーカーを検出し、
+    各サブセクションを小見出し行（太字）+ テキストブロックで表示する。
+    マーカーが見つからない場合は、従来通り1ブロックで出力する。
+    """
+    import re
+    current_row = start_row
+    safe_column_count = max(2, int(column_count or 2))
+    header_fill = section_header_fill or EXCEL_SECTION_FILL
+
+    # セクション見出し行
+    merge_excel_row(worksheet, current_row, safe_column_count)
+    title_cell = worksheet.cell(row=current_row, column=1, value=section_title)
+    style_excel_cell(
+        title_cell,
+        font=EXCEL_BOLD_FONT,
+        fill=header_fill,
+        alignment=Alignment(horizontal="left", vertical="center"),
+        border=EXCEL_THIN_BORDER,
+    )
+    worksheet.row_dimensions[current_row].height = 22
+    current_row += 1
+
+    normalized_text = str(full_text or "").strip()
+    if not normalized_text:
+        merge_excel_row(worksheet, current_row, safe_column_count)
+        empty_cell = worksheet.cell(
+            row=current_row, column=1, value="解説テキストがありません。"
+        )
+        style_excel_cell(
+            empty_cell,
+            font=EXCEL_MUTED_FONT,
+            fill=EXCEL_LABEL_FILL,
+            alignment=Alignment(wrap_text=True, vertical="center"),
+            border=EXCEL_THIN_BORDER,
+        )
+        worksheet.row_dimensions[current_row].height = 22
+        return current_row + 2
+
+    # 【...】マーカーでテキストを分割
+    marker_pattern = re.compile(
+        rf"^{re.escape(subsection_marker_start)}(.+?){re.escape(subsection_marker_end)}\s*$",
+        re.MULTILINE,
+    )
+    parts = marker_pattern.split(normalized_text)
+    # parts: [前テキスト, マーカー1タイトル, マーカー1本文, マーカー2タイトル, マーカー2本文, ...]
+
+    if len(parts) <= 1:
+        # マーカーなし: 従来通り1ブロックで出力
+        merge_excel_row(worksheet, current_row, safe_column_count)
+        text_cell = worksheet.cell(row=current_row, column=1, value=normalized_text)
+        style_excel_cell(
+            text_cell,
+            font=EXCEL_BODY_FONT,
+            fill=EXCEL_TEXT_BLOCK_FILL,
+            alignment=Alignment(wrap_text=True, vertical="top"),
+            border=EXCEL_THIN_BORDER,
+        )
+        worksheet.row_dimensions[current_row].height = estimate_wrapped_row_height(
+            normalized_text, safe_column_count
+        )
+        return current_row + 2
+
+    # 最初の部分（マーカー前のテキスト）がある場合
+    preamble = parts[0].strip()
+    if preamble:
+        merge_excel_row(worksheet, current_row, safe_column_count)
+        preamble_cell = worksheet.cell(row=current_row, column=1, value=preamble)
+        style_excel_cell(
+            preamble_cell,
+            font=EXCEL_BODY_FONT,
+            fill=EXCEL_TEXT_BLOCK_FILL,
+            alignment=Alignment(wrap_text=True, vertical="top"),
+            border=EXCEL_THIN_BORDER,
+        )
+        worksheet.row_dimensions[current_row].height = estimate_wrapped_row_height(
+            preamble, safe_column_count
+        )
+        current_row += 1
+
+    # マーカー付きサブセクションを出力
+    for i in range(1, len(parts), 2):
+        subsection_title = parts[i].strip()
+        subsection_body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+
+        # 小見出し行（太字、背景なし）
+        merge_excel_row(worksheet, current_row, safe_column_count)
+        subtitle_cell = worksheet.cell(
+            row=current_row, column=1, value=f"▸ {subsection_title}"
+        )
+        style_excel_cell(
+            subtitle_cell,
+            font=EXCEL_BOLD_FONT,
+            fill=None,
+            alignment=Alignment(horizontal="left", vertical="center"),
+            border=EXCEL_THIN_BORDER,
+        )
+        worksheet.row_dimensions[current_row].height = 20
+        current_row += 1
+
+        # 本文テキスト
+        if subsection_body:
+            merge_excel_row(worksheet, current_row, safe_column_count)
+            body_cell = worksheet.cell(
+                row=current_row, column=1, value=subsection_body
+            )
+            style_excel_cell(
+                body_cell,
+                font=EXCEL_BODY_FONT,
+                fill=EXCEL_TEXT_BLOCK_FILL,
+                alignment=Alignment(wrap_text=True, vertical="top"),
+                border=EXCEL_THIN_BORDER,
+            )
+            worksheet.row_dimensions[current_row].height = (
+                estimate_wrapped_row_height(subsection_body, safe_column_count)
+            )
+            current_row += 1
+
+    return current_row + 1

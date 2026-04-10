@@ -327,7 +327,7 @@ class WebAppTestCase(unittest.TestCase):
                 "provider": "Ollama (qwen2.5:7b)",
                 "generated_at": "2026-04-02T00:00:00+00:00",
                 "period": "2024-01-01 09:00 〜 2024-01-04 09:00",
-                "text": "【全体サマリー】\nテスト用の分析コメントです。",
+                "text": "【全体傾向】\nテスト用の分析コメントです。",
                 "highlights": [
                     "Submit が中心のルートです。",
                     "Approve の前後を重点確認してください。",
@@ -422,7 +422,7 @@ class WebAppTestCase(unittest.TestCase):
         self.assertLess(explanation_row, terminology_row)
         self.assertLess(terminology_row, disclaimer_row)
         self.assertIn("処理時間は、同一ケース内で", str(ai_sheet.cell(row=analysis_premise_row + 1, column=1).value))
-        self.assertIn("テスト用の分析コメント", str(ai_sheet.cell(row=explanation_row + 1, column=1).value))
+        self.assertIn("テスト用の分析コメント", str(ai_sheet.cell(row=explanation_row + 2, column=1).value))
         self.assertEqual("用語", ai_sheet.cell(row=terminology_row + 1, column=1).value)
         self.assertEqual("説明", ai_sheet.cell(row=terminology_row + 1, column=2).value)
         self.assertEqual("ケース", ai_sheet.cell(row=terminology_row + 2, column=1).value)

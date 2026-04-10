@@ -40,6 +40,7 @@ from web_reports.excel_common import (
     append_definition_table_to_worksheet,
     append_key_value_rows,
     append_table_to_worksheet,
+    append_structured_text_block_to_worksheet,
     append_text_block_to_worksheet,
     autosize_worksheet_columns,
     build_analysis_excel_file_name,
@@ -203,7 +204,7 @@ def _append_detail_export_ai_sheet(workbook, context):
         column_count=6,
         header_fill=EXCEL_ASSUMPTION_SECTION_FILL,
     )
-    next_row = append_text_block_to_worksheet(
+    next_row = append_structured_text_block_to_worksheet(
         ai_sheet,
         "解説本文",
         context["ai_summary"].get("text", ""),
