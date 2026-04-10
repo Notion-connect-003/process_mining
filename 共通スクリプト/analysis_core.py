@@ -193,7 +193,7 @@ def create_variant_summary(prepared_df, limit=10):
             "count": int(row["count"]),
             "ratio": round(float(row["count"]) / total_cases, 4) if total_cases else 0.0,
             "avg_case_duration_sec": float(row["avg_case_duration_sec"]),
-            "avg_case_duration_text": _format_duration_text(row["avg_case_duration_sec"]),
+            "avg_case_duration_text": format_duration_text(row["avg_case_duration_sec"]),
         }
         for index, row in enumerate(variant_summary_df.to_dict(orient="records"))
     ]
@@ -209,3 +209,90 @@ HEAT_CLASS_COUNT = 5
 
 def build_transition_key(from_activity, to_activity):
     return f"{from_activity}__TO__{to_activity}"
+
+def filter_prepared_df_by_pattern(prepared_df, pattern):
+    case_pattern_df = build_case_pattern_table(prepared_df)
+    matched_case_ids = case_pattern_df.loc[case_pattern_df["pattern"] == pattern, "case_id"]
+
+    if matched_case_ids.empty:
+        return prepared_df.iloc[0:0].copy()
+
+    return prepared_df[prepared_df["case_id"].isin(matched_case_ids)].copy()
+
+
+def build_duration_interval_table(prepared_df):
+    interval_df = prepared_df.sort_values(["case_id", "sequence_no"]).copy()
+    interval_df["next_activity"] = interval_df.groupby("case_id")["activity"].shift(-1)
+    interval_df = interval_df[interval_df["next_activity"].notna()].copy()
+    interval_df["transition_key"] = (
+        interval_df["activity"].astype(str)
+        + "__TO__"
+        + interval_df["next_activity"].astype(str)
+    )
+    return interval_df
+
+
+def _append_duration_metrics(summary_df):
+    duration_metric_pairs = (
+        ("avg_duration_sec", "avg_duration_hours"),
+        ("median_duration_sec", "median_duration_hours"),
+        ("max_duration_sec", "max_duration_hours"),
+    )
+
+    for duration_sec_column, duration_hour_column in duration_metric_pairs:
+        summary_df[duration_hour_column] = summary_df[duration_sec_column] / 3600
+
+    return summary_df
+
+
+def build_heatmap(items, key_name):
+    max_avg_duration_sec = max(
+        (float(item["avg_duration_sec"]) for item in items),
+        default=0.0,
+    )
+    heatmap = {}
+
+    for item in items:
+        heat_score = (
+            float(item["avg_duration_sec"]) / max_avg_duration_sec
+            if max_avg_duration_sec > 0
+            else 0.0
+        )
+        heat_score = round(max(0.0, min(1.0, heat_score)), 4)
+
+        if heat_score <= 0.2:
+            heat_level = 1
+        elif heat_score <= 0.4:
+            heat_level = 2
+        elif heat_score <= 0.6:
+            heat_level = 3
+        elif heat_score <= 0.8:
+            heat_level = 4
+        else:
+            heat_level = 5
+        heatmap[item[key_name]] = {
+            "avg_duration_sec": float(item["avg_duration_sec"]),
+            "avg_duration_hours": float(item["avg_duration_hours"]),
+            "heat_score": heat_score,
+            "heat_level": heat_level,
+            "heat_class": f"heat-{heat_level}",
+        }
+
+    return heatmap
+
+
+def format_duration_text(duration_sec):
+    total_seconds = max(0, int(round(float(duration_sec or 0))))
+    days, remainder = divmod(total_seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    parts = []
+
+    if days:
+        parts.append(f"{days}d")
+    if hours or days:
+        parts.append(f"{hours}h")
+    if minutes or hours or days:
+        parts.append(f"{minutes}m")
+    parts.append(f"{seconds}s")
+    return " ".join(parts)

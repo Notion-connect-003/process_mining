@@ -106,8 +106,8 @@ def query_bottleneck_summary(parquet_path, filter_params=None, filter_column_set
         return {
             "activity_bottlenecks": limited_activity_items,
             "transition_bottlenecks": limited_transition_items,
-            "activity_heatmap": _build_heatmap(activity_items, "activity"),
-            "transition_heatmap": _build_heatmap(transition_items, "transition_key"),
+            "activity_heatmap": build_heatmap(activity_items, "activity"),
+            "transition_heatmap": build_heatmap(transition_items, "transition_key"),
         }
     finally:
         connection.close()
@@ -199,9 +199,9 @@ def query_impact_summary(parquet_path, filter_params=None, filter_column_setting
                     "count": int(row["count"]),
                     "case_count": int(row["case_count"]),
                     "avg_duration_sec": float(row["avg_duration_sec"]),
-                    "avg_duration_text": _format_duration_text(row["avg_duration_sec"]),
+                    "avg_duration_text": format_duration_text(row["avg_duration_sec"]),
                     "max_duration_sec": float(row["max_duration_sec"]),
-                    "max_duration_text": _format_duration_text(row["max_duration_sec"]),
+                    "max_duration_text": format_duration_text(row["max_duration_sec"]),
                     "wait_share_pct": float(row["wait_share_pct"]),
                     "impact_score": float(row["impact_score"]),
                     "impact_share_pct": float(row["impact_share_pct"]),
@@ -298,11 +298,11 @@ def query_dashboard_summary(
             "total_records": total_records,
             "activity_type_count": activity_type_count,
             "avg_case_duration_sec": round(avg_case_duration_sec, 2),
-            "avg_case_duration_text": _format_duration_text(avg_case_duration_sec),
+            "avg_case_duration_text": format_duration_text(avg_case_duration_sec),
             "median_case_duration_sec": round(median_case_duration_sec, 2),
-            "median_case_duration_text": _format_duration_text(median_case_duration_sec),
+            "median_case_duration_text": format_duration_text(median_case_duration_sec),
             "max_case_duration_sec": round(max_case_duration_sec, 2),
-            "max_case_duration_text": _format_duration_text(max_case_duration_sec),
+            "max_case_duration_text": format_duration_text(max_case_duration_sec),
             "top10_variant_coverage_ratio": top10_variant_coverage_ratio,
             "top10_variant_coverage_pct": round(top10_variant_coverage_ratio * 100, 2),
             "top_bottleneck_transition_label": (
@@ -312,7 +312,7 @@ def query_dashboard_summary(
             ),
             "top_bottleneck_avg_wait_sec": top_bottleneck_avg_wait_sec,
             "top_bottleneck_avg_wait_hours": round(top_bottleneck_avg_wait_sec / 3600, 2) if top_transition_bottleneck else 0.0,
-            "top_bottleneck_avg_wait_text": _format_duration_text(top_bottleneck_avg_wait_sec) if top_transition_bottleneck else "",
+            "top_bottleneck_avg_wait_text": format_duration_text(top_bottleneck_avg_wait_sec) if top_transition_bottleneck else "",
         }
     finally:
         connection.close()
@@ -394,11 +394,11 @@ def query_root_cause_summary(
                         "case_count": int(row["case_count"]),
                         "case_ratio_pct": case_ratio_pct,
                         "avg_case_duration_sec": avg_case_duration_sec,
-                        "avg_case_duration_text": _format_duration_text(avg_case_duration_sec),
+                        "avg_case_duration_text": format_duration_text(avg_case_duration_sec),
                         "median_case_duration_sec": median_case_duration_sec,
-                        "median_case_duration_text": _format_duration_text(median_case_duration_sec),
+                        "median_case_duration_text": format_duration_text(median_case_duration_sec),
                         "max_case_duration_sec": max_case_duration_sec,
-                        "max_case_duration_text": _format_duration_text(max_case_duration_sec),
+                        "max_case_duration_text": format_duration_text(max_case_duration_sec),
                     }
                 )
             groups.append(
@@ -618,7 +618,7 @@ def query_transition_case_drilldown(parquet_path, from_activity, to_activity, li
             {
                 "case_id": row["case_id"],
                 "duration_sec": float(row["duration_sec"]),
-                "duration_text": _format_duration_text(row["duration_sec"]),
+                "duration_text": format_duration_text(row["duration_sec"]),
                 "from_time": pd.Timestamp(row["start_time"]).isoformat(),
                 "to_time": pd.Timestamp(row["next_time"]).isoformat(),
             }
@@ -667,7 +667,7 @@ def query_activity_case_drilldown(parquet_path, activity, limit=20, filter_param
                 "activity": row["activity"],
                 "next_activity": row["next_activity"],
                 "duration_sec": float(row["duration_sec"]),
-                "duration_text": _format_duration_text(row["duration_sec"]),
+                "duration_text": format_duration_text(row["duration_sec"]),
                 "from_time": pd.Timestamp(row["start_time"]).isoformat(),
                 "to_time": pd.Timestamp(row["next_time"]).isoformat(),
             }
@@ -717,7 +717,7 @@ def query_case_trace_details(parquet_path, case_id):
                     "timestamp": pd.Timestamp(row["start_time"]).isoformat(),
                     "next_activity": row["next_activity"] if has_next_activity else None,
                     "wait_to_next_sec": duration_sec if has_next_activity else None,
-                    "wait_to_next_text": _format_duration_text(duration_sec) if has_next_activity else "",
+                    "wait_to_next_text": format_duration_text(duration_sec) if has_next_activity else "",
                 }
             )
         return {
@@ -728,7 +728,7 @@ def query_case_trace_details(parquet_path, case_id):
                 "start_time": start_time,
                 "end_time": end_time,
                 "total_duration_sec": total_duration_sec,
-                "total_duration_text": _format_duration_text(total_duration_sec),
+                "total_duration_text": format_duration_text(total_duration_sec),
             },
             "events": events,
         }

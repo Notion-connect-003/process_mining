@@ -18,11 +18,12 @@ from 共通スクリプト.analysis_constants import (
     convert_analysis_result_to_records,
     create_transition_analysis,
 )
-from 共通スクリプト.analysis_core import build_case_pattern_table, build_transition_key
-from 共通スクリプト.analysis_insights import (
-    _format_duration_text,
-    filter_prepared_df_by_pattern,
+from 共通スクリプト.analysis_core import (
+    build_case_pattern_table,
     build_duration_interval_table,
+    build_transition_key,
+    filter_prepared_df_by_pattern,
+    format_duration_text,
 )
 
 
@@ -228,7 +229,7 @@ def _build_flow_graph(pattern_rows, transition_rows=None, frequency_rows=None):
         avg_duration_min = _get_transition_avg_duration_min(row)
         edge_map[edge_key]["avg_duration_min"] = avg_duration_min
         edge_map[edge_key]["avg_duration_sec"] = round(avg_duration_min * 60, 2)
-        edge_map[edge_key]["avg_duration_text"] = _format_duration_text(avg_duration_min * 60)
+        edge_map[edge_key]["avg_duration_text"] = format_duration_text(avg_duration_min * 60)
 
     nodes = list(node_map.values())
     edges = [
@@ -642,136 +643,7 @@ def create_variant_flow_snapshot(
     )
 
 
-def create_pattern_bottleneck_details(prepared_df, pattern):
-    pattern_df = filter_prepared_df_by_pattern(prepared_df, pattern)
-
-    if pattern_df.empty:
-        raise ValueError("パターンが見つかりません。")
-
-    pattern_df = pattern_df.sort_values(["case_id", "sequence_no"]).copy()
-    transition_df = build_duration_interval_table(pattern_df)
-
-    if transition_df.empty:
-        step_metrics = []
-        bottleneck_transition = None
-    else:
-        step_metrics_df = (
-            transition_df.groupby(["sequence_no", "activity", "next_activity"])
-            .agg(
-                case_count=("case_id", "count"),
-                avg_duration_min=("duration_min", "mean"),
-                median_duration_min=("duration_min", "median"),
-                min_duration_min=("duration_min", "min"),
-                max_duration_min=("duration_min", "max"),
-                total_duration_min=("duration_min", "sum"),
-            )
-            .reset_index()
-            .sort_values(["sequence_no", "activity", "next_activity"])
-            .reset_index(drop=True)
-        )
-        numeric_columns = [
-            "avg_duration_min",
-            "median_duration_min",
-            "min_duration_min",
-            "max_duration_min",
-            "total_duration_min",
-        ]
-        step_metrics_df[numeric_columns] = step_metrics_df[numeric_columns].round(2)
-
-        total_wait_min = step_metrics_df["total_duration_min"].sum()
-        if total_wait_min > 0:
-            step_metrics_df["wait_share_pct"] = (
-                step_metrics_df["total_duration_min"] / total_wait_min * 100
-            ).round(2)
-        else:
-            step_metrics_df["wait_share_pct"] = 0.0
-
-        step_metrics_df["transition_label"] = (
-            step_metrics_df["activity"] + " → " + step_metrics_df["next_activity"]
-        )
-        step_metrics = [
-            {
-                "sequence_no": int(row["sequence_no"]),
-                "activity": row["activity"],
-                "next_activity": row["next_activity"],
-                "case_count": int(row["case_count"]),
-                "avg_duration_min": float(row["avg_duration_min"]),
-                "median_duration_min": float(row["median_duration_min"]),
-                "min_duration_min": float(row["min_duration_min"]),
-                "max_duration_min": float(row["max_duration_min"]),
-                "total_duration_min": float(row["total_duration_min"]),
-                "wait_share_pct": float(row["wait_share_pct"]),
-                "transition_label": row["transition_label"],
-                "transition_key": build_transition_key(row["activity"], row["next_activity"]),
-            }
-            for row in step_metrics_df.to_dict(orient="records")
-        ]
-
-        bottleneck_row = step_metrics_df.sort_values(
-            [
-                "avg_duration_min",
-                "median_duration_min",
-                "max_duration_min",
-                "sequence_no",
-            ],
-            ascending=[False, False, False, True],
-        ).iloc[0]
-        bottleneck_transition = {
-            "sequence_no": int(bottleneck_row["sequence_no"]),
-            "from_activity": bottleneck_row["activity"],
-            "to_activity": bottleneck_row["next_activity"],
-            "transition_label": bottleneck_row["transition_label"],
-            "transition_key": build_transition_key(
-                bottleneck_row["activity"],
-                bottleneck_row["next_activity"],
-            ),
-            "avg_duration_min": float(bottleneck_row["avg_duration_min"]),
-            "median_duration_min": float(bottleneck_row["median_duration_min"]),
-            "max_duration_min": float(bottleneck_row["max_duration_min"]),
-            "wait_share_pct": float(bottleneck_row["wait_share_pct"]),
-        }
-
-    case_summary_df = (
-        pattern_df.groupby("case_id")
-        .agg(
-            start_time=("start_time", "min"),
-            end_time=("next_time", "max"),
-            case_total_duration_min=("duration_min", "sum"),
-        )
-        .reset_index()
-        .sort_values(["case_total_duration_min", "case_id"], ascending=[False, True])
-        .reset_index(drop=True)
-    )
-    case_summary_df["case_total_duration_min"] = case_summary_df["case_total_duration_min"].round(2)
-
-    total_case_count = prepared_df["case_id"].nunique()
-    matched_case_count = int(case_summary_df["case_id"].nunique())
-
-    return {
-        "pattern": pattern,
-        "pattern_steps": pattern.split(FLOW_PATH_SEPARATOR),
-        "case_count": matched_case_count,
-        "case_ratio_pct": round(matched_case_count / total_case_count * 100, 2),
-        "avg_case_duration_min": round(float(case_summary_df["case_total_duration_min"].mean()), 2),
-        "median_case_duration_min": round(float(case_summary_df["case_total_duration_min"].median()), 2),
-        "min_case_duration_min": round(float(case_summary_df["case_total_duration_min"].min()), 2),
-        "max_case_duration_min": round(float(case_summary_df["case_total_duration_min"].max()), 2),
-        "bottleneck_transition": bottleneck_transition,
-        "step_metrics": step_metrics,
-        "case_examples": [
-            {
-                "case_id": row["case_id"],
-                "start_time": row["start_time"].isoformat(),
-                "end_time": row["end_time"].isoformat(),
-                "case_total_duration_min": float(row["case_total_duration_min"]),
-            }
-            for row in case_summary_df.head(20).to_dict(orient="records")
-        ],
-    }
-
-
-# -----------------------------------------------------------------------------
-# Compatibility entry point
+# -----------------------------------------------------------------------------`n# Compatibility entry point
 # -----------------------------------------------------------------------------
 
 def analyze_event_log(

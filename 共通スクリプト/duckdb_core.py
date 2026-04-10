@@ -15,10 +15,7 @@ from 共通スクリプト.analysis_filters import (
     normalize_filter_column_settings,
     normalize_filter_params,
 )
-from 共通スクリプト.analysis_insights import (
-    _build_heatmap,
-    _format_duration_text,
-)
+from 共通スクリプト.analysis_core import build_heatmap, format_duration_text
 from 共通スクリプト.分析.前後処理分析.transition_analysis import ANALYSIS_CONFIG as TRANSITION_ANALYSIS_CONFIG
 from 共通スクリプト.分析.処理順パターン分析.pattern_analysis import (
     ANALYSIS_CONFIG as PATTERN_ANALYSIS_CONFIG,
@@ -32,7 +29,6 @@ ANALYSIS_CONFIGS = {
     "transition": TRANSITION_ANALYSIS_CONFIG,
     "pattern": PATTERN_ANALYSIS_CONFIG,
 }
-FLOW_PATH_SEPARATOR = "\u2192"
 
 
 @lru_cache(maxsize=64)

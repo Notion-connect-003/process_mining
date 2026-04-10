@@ -610,7 +610,7 @@ def query_variant_summary(parquet_path, filter_params=None, filter_column_settin
                     "count": int(row.get("count") or 0),
                     "ratio": round(float(row.get("ratio") or 0.0), 4),
                     "avg_case_duration_sec": avg_case_duration_sec,
-                    "avg_case_duration_text": _format_duration_text(avg_case_duration_sec),
+                    "avg_case_duration_text": format_duration_text(avg_case_duration_sec),
                 }
             )
         return variant_items
