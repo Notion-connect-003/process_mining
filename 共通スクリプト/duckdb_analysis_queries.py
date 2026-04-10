@@ -616,3 +616,62 @@ def query_variant_summary(parquet_path, filter_params=None, filter_column_settin
         return variant_items
     finally:
         connection.close()
+
+
+def query_case_trace_details(parquet_path, case_id):
+    normalized_case_id = str(case_id or "").strip()
+    if not normalized_case_id:
+        raise ValueError("ケースIDが必要です。")
+    connection = duckdb.connect()
+    try:
+        query_sql = """
+        SELECT
+            sequence_no,
+            activity,
+            start_time,
+            next_time,
+            duration_sec,
+            LEAD(activity) OVER (ORDER BY sequence_no, start_time) AS next_activity
+        FROM read_parquet(?)
+        WHERE case_id = ?
+        ORDER BY sequence_no ASC, start_time ASC
+        """
+        case_df = connection.execute(query_sql, [str(parquet_path), normalized_case_id]).df()
+        if case_df.empty:
+            return {
+                "case_id": normalized_case_id,
+                "found": False,
+                "summary": None,
+                "events": [],
+            }
+        total_duration_sec = round(float(case_df["duration_sec"].sum()), 2)
+        start_time = pd.Timestamp(case_df["start_time"].min()).isoformat()
+        end_time = pd.Timestamp(case_df["next_time"].max()).isoformat()
+        events = []
+        for row in case_df.to_dict(orient="records"):
+            has_next_activity = isinstance(row["next_activity"], str) and bool(row["next_activity"])
+            duration_sec = float(row["duration_sec"] or 0.0)
+            events.append(
+                {
+                    "sequence_no": int(row["sequence_no"]),
+                    "activity": row["activity"],
+                    "timestamp": pd.Timestamp(row["start_time"]).isoformat(),
+                    "next_activity": row["next_activity"] if has_next_activity else None,
+                    "wait_to_next_sec": duration_sec if has_next_activity else None,
+                    "wait_to_next_text": format_duration_text(duration_sec) if has_next_activity else "",
+                }
+            )
+        return {
+            "case_id": normalized_case_id,
+            "found": True,
+            "summary": {
+                "event_count": int(len(case_df)),
+                "start_time": start_time,
+                "end_time": end_time,
+                "total_duration_sec": total_duration_sec,
+                "total_duration_text": format_duration_text(total_duration_sec),
+            },
+            "events": events,
+        }
+    finally:
+        connection.close()

@@ -153,7 +153,6 @@ def build_case_pattern_table(prepared_df):
 
 
 def create_variant_summary(prepared_df, limit=10):
-    from 共通スクリプト.analysis_insights import _format_duration_text
     case_variant_df = build_case_variant_table(prepared_df)
     case_variant_df["pattern"] = case_variant_df["activities"].apply(
         lambda activities: FLOW_PATH_SEPARATOR.join(activities)
