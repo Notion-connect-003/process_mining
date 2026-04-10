@@ -1,4 +1,4 @@
-from io import BytesIO
+﻿from io import BytesIO
 from datetime import datetime, timezone
 import duckdb
 
@@ -54,7 +54,12 @@ from web_reports.excel_common import (
 
 from web_reports.detail_report_helpers import *
 from web_reports.detail_report_sections import *
-from web_reports.detail_report_sections import _append_pattern_export_sheets
+from web_reports.detail_report_sections import (
+    _append_pattern_export_sheets,
+    _iter_groups_from_parquet,
+    _write_frequency_data,
+    _write_section_header,
+)
 
 def _create_report_sheet(workbook, title, *, use_active=False):
     worksheet = workbook.active if use_active else workbook.create_sheet()
@@ -505,3 +510,4 @@ def _append_detail_export_analysis_sheets(workbook, context, run_data, filter_pa
         _append_bottleneck_export_sheet(workbook, context)
     if "impact" in export_sheet_keys:
         _append_impact_export_sheet(workbook, context)
+

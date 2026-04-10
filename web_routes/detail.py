@@ -1,4 +1,4 @@
-from io import BytesIO
+﻿from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -109,15 +109,15 @@ def register_detail_routes(
                 "source_file_name": run_data["source_file_name"],
                 "analysis_name": pattern_analysis["analysis_name"],
                 "summary_row": summary_row,
-                "repeat_flag": summary_row.get("繰返し", ""),
-                "repeat_count": summary_row.get("繰返し回数", 0),
-                "repeat_rate_pct": summary_row.get("繰返し率(%)", 0),
-                "repeat_rate_band": summary_row.get("繰返し率帯", ""),
-                "review_flag": summary_row.get("要確認", ""),
-                "avg_case_duration_diff_min": summary_row.get("平均処理時間差_分", 0),
+                "repeat_flag": summary_row.get("繰り返し", ""),
+                "repeat_count": summary_row.get("繰り返し回数", 0),
+                "repeat_rate_pct": summary_row.get("繰り返し率(%)", 0),
+                "repeat_rate_band": summary_row.get("繰り返し率区分", ""),
+                "review_flag": summary_row.get("確認区分", ""),
+                "avg_case_duration_diff_min": summary_row.get("平均処理時間差分(分)", 0),
                 "improvement_priority_score": summary_row.get("改善優先度スコア", 0),
                 "overall_impact_pct": summary_row.get("全体影響度(%)", 0),
-                "fastest_pattern_flag": summary_row.get("最短パターン", ""),
+                "fastest_pattern_flag": summary_row.get("最短処理", ""),
                 "simple_comment": summary_row.get("簡易コメント", ""),
                 **detail,
             }
@@ -351,3 +351,4 @@ def register_detail_routes(
                 ),
             }
         )
+

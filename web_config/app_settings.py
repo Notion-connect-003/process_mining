@@ -1,9 +1,9 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SAMPLE_FILE = BASE_DIR / "process_mining_sample_10000行.csv"
 PROFILE_SAMPLE_FILE = BASE_DIR / "sample_event_log.csv"
+SAMPLE_FILE = PROFILE_SAMPLE_FILE
 RUN_STORAGE_DIR = BASE_DIR / "storage" / "runs"
 
 MAX_STORED_RUNS = 5
@@ -24,7 +24,7 @@ CASE_ID_COLUMN_CANDIDATES = [
     "CaseID",
     "caseid",
     "ケースID",
-    "案件ID",
+    "事案ID",
     "case_no",
     "CaseNo",
     "case_number",
@@ -59,7 +59,7 @@ TIMESTAMP_COLUMN_CANDIDATES = [
     "start_timestamp",
     "日時",
     "タイムスタンプ",
-    "実行日時",
+    "開始日時",
     "event_timestamp",
     "EventTimestamp",
     "time",

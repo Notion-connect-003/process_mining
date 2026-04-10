@@ -1,4 +1,4 @@
-from io import BytesIO
+﻿from io import BytesIO
 from datetime import datetime, timezone
 import duckdb
 
@@ -53,6 +53,12 @@ from web_reports.excel_common import (
 )
 
 from web_reports.detail_report_helpers import *
+from web_reports.detail_report_helpers import (
+    _build_scoped_relation_cte,
+    _format_stddev_column,
+    _get_parquet_column_names,
+    _quote_identifier,
+)
 from web_reports.detail_report_pattern_sheets import _append_pattern_export_sheets
 
 
@@ -584,4 +590,5 @@ def build_detail_summary_kpi_rows(
         ("最大ケース処理時間", dashboard_summary.get("max_case_duration_text", "0s")),
         ("最大ボトルネック遷移", top_transition_bottleneck_label),
     ]
+
 
