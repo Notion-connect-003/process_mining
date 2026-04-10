@@ -95,6 +95,7 @@ from 共通スクリプト.duckdb_core import (
 )
 from 共通スクリプト.duckdb_analysis_queries import (
     query_analysis_records,
+    query_case_trace_details,
     query_filter_options,
     query_filtered_meta,
     query_group_summary,
@@ -105,7 +106,6 @@ from 共通スクリプト.duckdb_analysis_queries import (
 from 共通スクリプト.duckdb_detail_queries import (
     query_activity_case_drilldown,
     query_bottleneck_summary,
-    query_case_trace_details,
     query_dashboard_summary,
     query_impact_summary,
     query_pattern_bottleneck_details,
