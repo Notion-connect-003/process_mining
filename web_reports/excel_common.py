@@ -56,6 +56,7 @@ REPORT_HEADER_LABELS = {
     "variant_id": "バリアントID",
     "count": "件数",
     "case_count": "対象ケース数",
+    "case_ratio_pct": "ケース比率(%)",
     "ratio": "比率",
     "cumulative_case_ratio_pct": "累積カバー率(%)",
     "pattern": "パターン",

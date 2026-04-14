@@ -6,6 +6,7 @@
         "activity": "アクティビティ",
         "event_count": "イベント件数",
         "case_count": "ケース数",
+        "case_ratio_pct": "ケース比率(%)",
         "total_duration_min": "合計処理時間(分)",
         "avg_duration_min": "平均処理時間(分)",
         "median_duration_min": "中央値処理時間(分)",
