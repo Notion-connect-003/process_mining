@@ -1041,7 +1041,10 @@ class WebAppTestCase(unittest.TestCase):
 
         frequency_workbook = load_workbook(BytesIO(frequency_response.content))
         pattern_workbook = load_workbook(BytesIO(pattern_response.content))
-        self.assertEqual(["サマリー", "分析コメント", "頻度分析"], self.visible_sheetnames(frequency_workbook))
+        self.assertEqual(
+            ["サマリー", "分析コメント", "頻度分析", "ボトルネック分析", "改善インパクト分析"],
+            self.visible_sheetnames(frequency_workbook),
+        )
         self.assertEqual(["サマリー", "分析コメント", "結論サマリー", "サマリーダッシュボード", "パターンサマリー", "処理順パターン分析", "パターン01詳細"], self.visible_sheetnames(pattern_workbook))
         frequency_explanation_row = self.find_row_by_value(frequency_workbook["分析コメント"], "解説本文")
         pattern_explanation_row = self.find_row_by_value(pattern_workbook["分析コメント"], "解説本文")

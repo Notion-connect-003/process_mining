@@ -26,7 +26,7 @@ def get_analysis_export_sheet_keys(analysis_key):
     sheet_keys = ["summary", "ai_insights"]
 
     if normalized_analysis_key == "frequency":
-        sheet_keys.append("frequency")
+        sheet_keys.extend(["frequency", "bottleneck", "impact"])
     elif normalized_analysis_key == "transition":
         sheet_keys.extend(["transition", "bottleneck", "impact"])
     elif normalized_analysis_key == "pattern":
