@@ -72,6 +72,8 @@ REPORT_HEADER_LABELS = {
     "avg_duration": "平均所要時間",
     "avg_duration_text": "平均所要時間",
     "avg_duration_min": "平均所要時間(分)",
+    "from_avg_duration_min": "前処理平均時間(分)",
+    "to_avg_duration_min": "後処理平均時間(分)",
     "median_duration_min": "中央値所要時間(分)",
     "std_duration_min": "標準偏差(分)",
     "min_duration_min": "最小所要時間(分)",
@@ -122,7 +124,7 @@ ANALYSIS_PRECONDITIONS_TEXT = "\n".join(
     ]
 )
 
-TERMINOLOGY_ROWS = [
+_TERMINOLOGY_ROWS_COMMON = [
     {
         "用語": "ケース",
         "説明": "業務プロセスの1つの実行単位（例: 1件の注文、1件の申請）",
@@ -139,11 +141,63 @@ TERMINOLOGY_ROWS = [
         "用語": "処理時間",
         "説明": "あるアクティビティの開始から次のアクティビティの開始までの所要時間",
     },
-    {
-        "用語": "イベント比率(%)",
-        "説明": "全イベント数に対する当該アクティビティのイベント数の割合",
-    },
 ]
+
+_TERMINOLOGY_ROWS_BY_ANALYSIS = {
+    "frequency": _TERMINOLOGY_ROWS_COMMON
+    + [
+        {
+            "用語": "イベント比率(%)",
+            "説明": "全イベント数に対する当該アクティビティのイベント数の割合",
+        },
+        {
+            "用語": "ケース比率(%)",
+            "説明": "全ケース数に対する当該アクティビティを含むケース数の割合",
+        },
+    ],
+    "transition": _TERMINOLOGY_ROWS_COMMON
+    + [
+        {
+            "用語": "遷移",
+            "説明": "前のアクティビティから次のアクティビティへの移行（前後関係）",
+        },
+        {
+            "用語": "遷移比率(%)",
+            "説明": "全遷移件数に対する当該遷移の割合",
+        },
+        {
+            "用語": "ケース比率(%)",
+            "説明": "全ケース数に対する当該遷移を含むケース数の割合",
+        },
+        {
+            "用語": "前処理平均時間(分)",
+            "説明": "遷移元アクティビティの平均処理時間",
+        },
+        {
+            "用語": "後処理平均時間(分)",
+            "説明": "遷移先アクティビティの平均処理時間",
+        },
+    ],
+    "pattern": _TERMINOLOGY_ROWS_COMMON
+    + [
+        {
+            "用語": "処理順パターン",
+            "説明": "ケース内のアクティビティの実行順序",
+        },
+        {
+            "用語": "ケース比率(%)",
+            "説明": "全ケース数に対する当該パターンのケース数の割合",
+        },
+    ],
+}
+
+TERMINOLOGY_ROWS = _TERMINOLOGY_ROWS_BY_ANALYSIS["frequency"]
+
+
+def get_terminology_rows(analysis_key=""):
+    """分析種別に応じた用語説明行を返す。"""
+    normalized_key = str(analysis_key or "").strip().lower()
+    return _TERMINOLOGY_ROWS_BY_ANALYSIS.get(normalized_key, _TERMINOLOGY_ROWS_COMMON)
 
 EXCEL_TITLE_FILL = PatternFill(fill_type="solid", fgColor="1F4E78")
 EXCEL_TITLE_FONT = Font(bold=True, size=14, color="FFFFFF")

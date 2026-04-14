@@ -355,4 +355,4 @@ register_ingest_routes(
 
 
 if __name__ == "__main__":
-    uvicorn.run("web_app:app", host="127.0.0.1", port=5000, reload=True)
+    uvicorn.run("web_app:app", host="127.0.0.1", port=5000, reload=False)

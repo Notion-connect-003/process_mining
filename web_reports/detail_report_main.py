@@ -18,7 +18,6 @@ from web_reports.excel_common import (
     GROUPING_CONDITION_NOTE_TEXT,
     REPORT_HEADER_LABELS,
     REPORT_SHEET_NAMES,
-    TERMINOLOGY_ROWS,
     append_bullet_rows,
     append_custom_text_section_to_worksheet,
     append_definition_table_to_worksheet,
@@ -27,6 +26,7 @@ from web_reports.excel_common import (
     append_table_to_worksheet,
     autosize_worksheet_columns,
     initialize_excel_worksheet,
+    get_terminology_rows,
     merge_excel_row,
     sanitize_workbook_sheet_name,
 )
@@ -168,7 +168,7 @@ def _insert_spacer_row(worksheet, row_index, column_count=6, height=8):
     return row_index + 1
 
 
-def _append_detail_export_ai_sheet(workbook, context):
+def _append_detail_export_ai_sheet(workbook, context, analysis_key=""):
     ai_sheet = _create_report_sheet(workbook, REPORT_SHEET_NAMES["ai_insights"])
     ai_meta_rows = [
         ("対象分析", context["analysis_name"]),
@@ -212,7 +212,7 @@ def _append_detail_export_ai_sheet(workbook, context):
     next_row = append_definition_table_to_worksheet(
         ai_sheet,
         "用語説明",
-        TERMINOLOGY_ROWS,
+        get_terminology_rows(analysis_key),
         start_row=next_row,
         column_count=6,
         header_fill=EXCEL_MUTED_SECTION_FILL,
@@ -336,7 +336,7 @@ def build_detail_export_workbook_bytes(
         selected_activity=selected_activity,
         case_id=case_id,
     )
-    _append_detail_export_ai_sheet(workbook, context)
+    _append_detail_export_ai_sheet(workbook, context, analysis_key=analysis_key)
     _append_detail_export_analysis_sheets(
         workbook,
         context,

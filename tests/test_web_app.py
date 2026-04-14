@@ -1986,6 +1986,7 @@ class WebAppTestCase(unittest.TestCase):
         self.assertTrue(rows, "前後処理分析の結果行が空です。")
 
         first_row = rows[0]
+        self.assertEqual(17, len(first_row))
         for col in (
             "平均所要時間(分)",
             "中央値所要時間(分)",
@@ -1995,8 +1996,31 @@ class WebAppTestCase(unittest.TestCase):
             "75%点(分)",
             "90%点(分)",
             "95%点(分)",
+            "ケース比率(%)",
+            "前処理平均時間(分)",
+            "後処理平均時間(分)",
         ):
             self.assertIn(col, first_row, f"列 '{col}' が前後処理分析の結果に存在しません。")
+
+    def test_get_terminology_rows(self):
+        from web_reports.excel_common import get_terminology_rows
+
+        freq_rows = get_terminology_rows("frequency")
+        self.assertTrue(any(row["用語"] == "イベント比率(%)" for row in freq_rows))
+        self.assertTrue(any(row["用語"] == "ケース比率(%)" for row in freq_rows))
+
+        trans_rows = get_terminology_rows("transition")
+        self.assertTrue(any(row["用語"] == "遷移" for row in trans_rows))
+        self.assertTrue(any(row["用語"] == "ケース比率(%)" for row in trans_rows))
+        self.assertTrue(any(row["用語"] == "前処理平均時間(分)" for row in trans_rows))
+        self.assertTrue(any(row["用語"] == "後処理平均時間(分)" for row in trans_rows))
+        self.assertFalse(any(row["用語"] == "イベント比率(%)" for row in trans_rows))
+
+        pattern_rows = get_terminology_rows("pattern")
+        self.assertTrue(any(row["用語"] == "処理順パターン" for row in pattern_rows))
+
+        unknown_rows = get_terminology_rows("unknown")
+        self.assertEqual(4, len(unknown_rows))
 
     def test_pattern_analysis_has_std_and_percentile_columns(self):
         """処理順パターン分析の結果に標準偏差・P75/P90/P95 列が含まれること。"""

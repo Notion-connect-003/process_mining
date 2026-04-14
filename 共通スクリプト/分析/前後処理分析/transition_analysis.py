@@ -7,6 +7,7 @@ ANALYSIS_CONFIG = {
         "to_activity": "後処理アクティビティ名",
         "transition_count": "遷移件数",
         "case_count": "ケース数",
+        "case_ratio_pct": "ケース比率(%)",
         "total_duration_min": "合計所要時間(分)",
         "avg_duration_min": "平均所要時間(分)",
         "median_duration_min": "中央値所要時間(分)",
@@ -16,16 +17,17 @@ ANALYSIS_CONFIG = {
         "p75_duration_min": "75%点(分)",
         "p90_duration_min": "90%点(分)",
         "p95_duration_min": "95%点(分)",
+        "from_avg_duration_min": "前処理平均時間(分)",
+        "to_avg_duration_min": "後処理平均時間(分)",
         "transition_ratio_pct": "遷移比率(%)",
     },
 }
 
 
-
 def create_transition_analysis(df, group_columns=None):
     work = df.copy()
 
-    # ケース内の次イベントを横持ちにして遷移を集計します。
+    # ケース内の次イベントを参照して前後遷移を集計します。
     work["next_activity"] = work.groupby("case_id")["activity"].shift(-1)
     work["next_start_time"] = work.groupby("case_id")["start_time"].shift(-1)
     work["next_duration_min"] = work.groupby("case_id")["duration_min"].shift(-1)
@@ -34,7 +36,6 @@ def create_transition_analysis(df, group_columns=None):
         (work["next_start_time"] - work["next_time"]).dt.total_seconds() / 60
     )
 
-    # group_columns が指定された場合はグルーピングモードとして集計します。
     valid_group_cols = [col for col in (group_columns or []) if col in work.columns]
     if valid_group_cols:
         groupby_keys = valid_group_cols + ["activity", "next_activity"]
@@ -67,7 +68,16 @@ def create_transition_analysis(df, group_columns=None):
     )
 
     total_transitions = result["transition_count"].sum()
-    result["transition_ratio_pct"] = (result["transition_count"] / total_transitions * 100).round(2)
+    result["transition_ratio_pct"] = (
+        result["transition_count"] / total_transitions * 100
+    ).round(2)
+
+    total_cases = work["case_id"].nunique()
+    result["case_ratio_pct"] = (
+        (result["case_count"] / total_cases * 100).round(2)
+        if total_cases
+        else 0.0
+    )
 
     numeric_cols = [
         "from_total_duration_min",
@@ -84,44 +94,41 @@ def create_transition_analysis(df, group_columns=None):
         "p75_duration_min",
         "p90_duration_min",
         "p95_duration_min",
+        "case_ratio_pct",
     ]
     result[numeric_cols] = result[numeric_cols].round(2)
 
-    # 標準偏差は遷移が1件のみの場合 NaN になるため "-" で表示する。
+    # 標準偏差は単一遷移だと NaN になるため表示用に "-" へ置換します。
     result["std_duration_min"] = (
-        result["std_duration_min"]
-        .round(2)
-        .where(result["std_duration_min"].notna(), other="-")
+        result["std_duration_min"].round(2).where(result["std_duration_min"].notna(), other="-")
     )
 
     sort_keys = valid_group_cols + ["transition_count", "from_activity", "to_activity"]
     sort_ascending = [True] * len(valid_group_cols) + [False, True, True]
     result = result.sort_values(sort_keys, ascending=sort_ascending).reset_index(drop=True)
 
-    ordered_columns = (
-        valid_group_cols
-        + [
-            "from_activity",
-            "to_activity",
-            "transition_count",
-            "case_count",
-            "total_duration_min",
-            "avg_duration_min",
-            "median_duration_min",
-            "std_duration_min",
-            "min_duration_min",
-            "max_duration_min",
-            "p75_duration_min",
-            "p90_duration_min",
-            "p95_duration_min",
-            "from_total_duration_min",
-            "from_avg_duration_min",
-            "to_total_duration_min",
-            "to_avg_duration_min",
-            "total_waiting_time_min",
-            "avg_waiting_time_min",
-            "transition_ratio_pct",
-        ]
-    )
+    ordered_columns = valid_group_cols + [
+        "from_activity",
+        "to_activity",
+        "transition_count",
+        "case_count",
+        "case_ratio_pct",
+        "total_duration_min",
+        "avg_duration_min",
+        "median_duration_min",
+        "std_duration_min",
+        "min_duration_min",
+        "max_duration_min",
+        "p75_duration_min",
+        "p90_duration_min",
+        "p95_duration_min",
+        "from_total_duration_min",
+        "from_avg_duration_min",
+        "to_total_duration_min",
+        "to_avg_duration_min",
+        "total_waiting_time_min",
+        "avg_waiting_time_min",
+        "transition_ratio_pct",
+    ]
 
     return result[[col for col in ordered_columns if col in result.columns]]
