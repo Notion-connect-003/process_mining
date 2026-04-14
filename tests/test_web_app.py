@@ -549,6 +549,51 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual("\u30b1\u30fc\u30b9\u6982\u8981", case_trace_sheet["A1"].value)
         self.assertEqual("\u901a\u904e\u30a4\u30d9\u30f3\u30c8", case_trace_sheet["A10"].value)
 
+    def test_report_excel_group_comparison_in_ai_text(self):
+        """???????????AI????????????????????????????????"""
+        run_id = self.analyze_uploaded_csv(
+            "\n".join(
+                [
+                    "case_id,activity,start_time,department",
+                    "C001,Submit,2024-01-01 09:00:00,Sales",
+                    "C001,Approve,2024-01-01 10:00:00,Sales",
+                    "C002,Submit,2024-01-02 09:00:00,Sales",
+                    "C002,Approve,2024-01-02 11:00:00,Sales",
+                    "C003,Submit,2024-01-03 09:00:00,HR",
+                    "C003,Approve,2024-01-03 09:30:00,HR",
+                    "C004,Submit,2024-01-04 09:00:00,HR",
+                    "C004,Approve,2024-01-04 09:45:00,HR",
+                ]
+            ),
+            extra_data={
+                "filter_column_1": "department",
+            },
+        )
+
+        response = self.client.get(
+            f"/api/runs/{run_id}/report-excel"
+            "?analysis_key=frequency"
+        )
+
+        self.assertEqual(200, response.status_code)
+
+        workbook = load_workbook(BytesIO(response.content))
+        ai_sheet = workbook["\u5206\u6790\u30b3\u30e1\u30f3\u30c8"]
+
+        all_values = []
+        for row_index in range(1, ai_sheet.max_row + 1):
+            cell_value = ai_sheet.cell(row=row_index, column=1).value
+            if cell_value:
+                all_values.append(str(cell_value))
+
+        full_text = "\n".join(all_values)
+
+        self.assertIn("\u30b0\u30eb\u30fc\u30d7\u9593\u6bd4\u8f03", full_text)
+        self.assertTrue(
+            "Sales" in full_text or "HR" in full_text,
+            f"Group names not found in AI text: {full_text[:500]}",
+        )
+
     def test_report_excel_export_api_falls_back_when_ollama_is_unavailable(self):
         run_id = self.analyze_uploaded_csv(
             "\n".join(

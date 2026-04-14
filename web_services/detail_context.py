@@ -16,6 +16,7 @@ from web_services.run_helpers import build_filter_summary_text
 from 共通スクリプト.analysis_service import get_available_analysis_definitions
 from 共通スクリプト.duckdb_service import (
     query_bottleneck_summary,
+    query_group_summary,
     query_period_text,
 )
 
@@ -64,6 +65,56 @@ def get_detail_export_bottleneck_summary(
         variant_id=variant_id,
         filter_params=filter_params,
     )
+
+
+def _build_ai_group_summary_rows(raw_group_summary, group_columns):
+    if not isinstance(raw_group_summary, dict):
+        return []
+
+    meta = raw_group_summary.get("__meta__") or {}
+    summary_rows = []
+
+    for column_name in list(group_columns or []):
+        column_summary = raw_group_summary.get(column_name) or {}
+        if not isinstance(column_summary, dict):
+            continue
+
+        if meta:
+            summary_rows.append(
+                {
+                    "group_column": column_name,
+                    "value": "\u5168\u4f53",
+                    "case_count": int(meta.get("total_case_count", 0) or 0),
+                    "event_count": int(meta.get("total_event_count", 0) or 0),
+                    "avg_case_duration_min": float(meta.get("avg_duration_min", 0) or 0),
+                    "median_case_duration_min": float(meta.get("median_duration_min", 0) or 0),
+                    "max_case_duration_min": float(meta.get("max_duration_min", 0) or 0),
+                    "total_case_duration_min": float(meta.get("total_duration_min", 0) or 0),
+                }
+            )
+
+        for group_value, stats in column_summary.items():
+            if not isinstance(stats, dict):
+                continue
+            normalized_value = str(group_value or "").strip()
+            if not normalized_value:
+                continue
+            summary_rows.append(
+                {
+                    "group_column": column_name,
+                    "value": normalized_value,
+                    "case_count": int(stats.get("case_count", 0) or 0),
+                    "case_ratio_pct": float(stats.get("case_ratio_pct", 0) or 0),
+                    "event_count": int(stats.get("event_count", 0) or 0),
+                    "event_ratio_pct": float(stats.get("event_ratio_pct", 0) or 0),
+                    "avg_case_duration_min": float(stats.get("avg_duration_min", 0) or 0),
+                    "median_case_duration_min": float(stats.get("median_duration_min", 0) or 0),
+                    "max_case_duration_min": float(stats.get("max_duration_min", 0) or 0),
+                    "total_case_duration_min": float(stats.get("total_duration_min", 0) or 0),
+                }
+            )
+
+    return summary_rows
 
 
 def build_detail_export_context(
@@ -138,6 +189,19 @@ def build_detail_export_context(
         bottleneck_summary=bottleneck_summary,
         impact_summary=impact_summary,
     )
+    group_columns = get_run_group_columns(run_data)
+    group_summary = None
+    if group_columns:
+        group_summary = _build_ai_group_summary_rows(
+            query_group_summary(
+                run_data["prepared_parquet_path"],
+                group_columns,
+                filter_params=filter_params,
+                filter_column_settings=run_data.get("column_settings"),
+                variant_pattern=variant_pattern,
+            ),
+            group_columns,
+        )
     ai_summary = build_excel_ai_summary_fn(
         run_data=run_data,
         analysis_key=analysis_key,
@@ -154,6 +218,8 @@ def build_detail_export_context(
         variant_items=export_variant_items[:5],
         use_cache=variant_id is None,
         generate_text=generate_text,
+        group_columns=group_columns,
+        group_summary=group_summary,
     )
     from_activity, to_activity = parse_transition_selection(selected_transition_key)
     selected_transition_label = (
@@ -167,8 +233,6 @@ def build_detail_export_context(
         filter_column_settings=run_data.get("column_settings"),
         variant_pattern=variant_pattern,
     )
-    group_columns = get_run_group_columns(run_data)
-
     return {
         "analysis_definitions": analysis_definitions,
         "analysis_name": analysis_name,
@@ -192,6 +256,7 @@ def build_detail_export_context(
         "selected_transition_label": selected_transition_label,
         "period_text": period_text,
         "group_columns": group_columns,
+        "group_summary": group_summary or [],
     }
 
 

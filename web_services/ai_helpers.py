@@ -58,135 +58,140 @@ def build_analysis_ai_prompt(ai_context):
     analysis_name = ai_context["analysis_name"]
     focus_map = {
         "frequency": {
-            "focus": "件数が集中しているアクティビティと、平均処理時間が長いアクティビティを分けて解釈してください。",
-            "priority": "負荷集中、入力不備、担当偏り、差戻し起点を優先して原因仮説を述べてください。",
-            "actions": "入口制御、担当割付、事前チェック、差戻し削減に直結する改善アクションを提案してください。",
+            "focus": "\u4ef6\u6570\u304c\u96c6\u4e2d\u3057\u3066\u3044\u308b\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u3068\u3001\u5e73\u5747\u51e6\u7406\u6642\u9593\u304c\u9577\u3044\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u3092\u7279\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "priority": "\u983b\u5ea6\u306e\u504f\u308a\u3001\u51e6\u7406\u6642\u9593\u3001\u3070\u3089\u3064\u304d\u306e3\u70b9\u3092\u7d44\u307f\u5408\u308f\u305b\u3066\u3001\u6539\u5584\u4f59\u5730\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "actions": "\u5165\u53e3\u51e6\u7406\u306e\u898b\u76f4\u3057\u3001\u91cd\u8907\u4f5c\u696d\u306e\u524a\u6e1b\u3001\u6ede\u7559\u30b1\u30fc\u30b9\u306e\u78ba\u8a8d\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
         },
         "transition": {
-            "focus": "前後遷移の処理時間、引き継ぎの詰まり、ループや差戻しを中心に解釈してください。",
-            "priority": "最も遅い遷移と改善インパクトが大きい遷移を分けて説明してください。",
-            "actions": "承認待ち、差戻し、バッチ処理、手作業の受け渡しを減らす改善アクションを提案してください。",
+            "focus": "\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u306b\u306a\u3063\u3066\u3044\u308b\u9077\u79fb\u3068\u3001\u305d\u306e\u524d\u5f8c\u306e\u51e6\u7406\u306e\u3064\u306a\u304c\u308a\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "priority": "\u9077\u79fb\u6642\u9593\u306e\u9577\u3055\u3001\u6539\u5584\u30a4\u30f3\u30d1\u30af\u30c8\u3001\u95a2\u9023\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u306e\u504f\u308a\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "actions": "\u524d\u5f8c\u5de5\u7a0b\u306e\u5f15\u304d\u7d99\u304e\u3001\u5f85\u3061\u6642\u9593\u3001\u627f\u8a8d\u7d4c\u8def\u306e\u898b\u76f4\u3057\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
         },
         "pattern": {
-            "focus": "標準ルートと例外ルートの違い、分岐の多さ、例外パターンの発生理由を解釈してください。",
-            "priority": "最頻出パターンと、時間が長い例外パターンを比較して説明してください。",
-            "actions": "標準化、例外削減、分岐条件の見直しに直結する改善アクションを提案してください。",
+            "focus": "\u4e3b\u8981\u30d1\u30bf\u30fc\u30f3\u3068\u4f8b\u5916\u30d1\u30bf\u30fc\u30f3\u306e\u5dee\u3092\u660e\u78ba\u306b\u3057\u3001\u3069\u306e\u9806\u5e8f\u306b\u6539\u5584\u4f59\u5730\u304c\u3042\u308b\u304b\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "priority": "\u51fa\u73fe\u983b\u5ea6\u3001\u51e6\u7406\u6642\u9593\u3001\u5206\u5c90\u306e\u9055\u3044\u304b\u3089\u6539\u5584\u4f59\u5730\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "actions": "\u4f8b\u5916\u30eb\u30fc\u30c8\u306e\u539f\u56e0\u7279\u5b9a\u3084\u6a19\u6e96\u30eb\u30fc\u30c8\u3078\u306e\u96c6\u7d04\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
         },
     }
     focus_config = focus_map.get(
         analysis_key,
         {
-            "focus": "主要な傾向、滞留箇所、改善優先度を解釈してください。",
-            "priority": "影響が大きい箇所を数値付きで説明してください。",
-            "actions": "現場で着手しやすい改善アクションを提案してください。",
+            "focus": "\u4e3b\u8981\u306a\u50be\u5411\u3068\u3001\u305d\u3053\u304b\u3089\u898b\u3048\u308b\u8ab2\u984c\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "priority": "\u51e6\u7406\u6642\u9593\u3001\u4ef6\u6570\u3001\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u306e\u89b3\u70b9\u3092\u6574\u7406\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "actions": "\u73fe\u5834\u3067\u6b21\u306b\u78ba\u8a8d\u3059\u3079\u304d\u30a2\u30af\u30b7\u30e7\u30f3\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
         },
     )
 
-    return f"""あなたはプロセスマイニング結果を業務改善に落とし込むアナリストです。
-以下は「{analysis_name}」の詳細画面に対応する分析データです。現場担当者が画面を切り替えても同じ解釈を再利用できるよう、論点がぶれない説明にしてください。
+    group_columns = ai_context.get("group_columns", [])
+    group_summary = ai_context.get("group_summary", [])
+    comparable_group_rows = [
+        row
+        for row in group_summary
+        if str(row.get("value") or row.get("\u5024") or "") != "\u5168\u4f53"
+    ]
 
-## この分析で重視する視点
+    group_prompt_section = ""
+    group_instruction = ""
+    if len(comparable_group_rows) >= 2:
+        group_prompt_section = f"""
+
+## \u30b0\u30eb\u30fc\u30d7\u5225\u96c6\u8a08\uff08\u30b0\u30eb\u30fc\u30d4\u30f3\u30b0\u8ef8: {"\u3001".join(group_columns)}\uff09
+{serialize_ai_prompt_rows(group_summary, max_items=10)}
+"""
+        group_instruction = """
+?\u30b0\u30eb\u30fc\u30d7\u9593\u6bd4\u8f03?
+\u30b0\u30eb\u30fc\u30d7\u5225\u96c6\u8a08\u30c7\u30fc\u30bf\u306b\u57fa\u3065\u304d\u3001\u30b0\u30eb\u30fc\u30d7\u9593\u306e\u7279\u5fb4\u7684\u306a\u9055\u3044\u30922\u301c3\u70b9\u6307\u6458\u3057\u3066\u304f\u3060\u3055\u3044\u3002
+\u4ee5\u4e0b\u306e\u89b3\u70b9\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044:
+- \u30b1\u30fc\u30b9\u6570\u30fb\u30a4\u30d9\u30f3\u30c8\u6570\u306e\u504f\u308a\u304c\u3042\u308b\u30b0\u30eb\u30fc\u30d7
+- \u30b0\u30eb\u30fc\u30d7\u9593\u3067\u5e73\u5747\u51e6\u7406\u6642\u9593\u306b\u5dee\u304c\u3042\u308b\u30dd\u30a4\u30f3\u30c8
+- \u7279\u5b9a\u306e\u30b0\u30eb\u30fc\u30d7\u3067\u9855\u8457\u306a\u7279\u5fb4\uff08\u51e6\u7406\u6642\u9593\u304c\u7a81\u51fa\u3057\u3066\u9577\u3044/\u77ed\u3044\u7b49\uff09
+
+"""
+
+    return f"""\u3042\u306a\u305f\u306f\u30d7\u30ed\u30bb\u30b9\u30de\u30a4\u30cb\u30f3\u30b0\u306e\u5206\u6790\u7d50\u679c\u3092\u8981\u7d04\u3059\u308b\u30a2\u30ca\u30ea\u30b9\u30c8\u3067\u3059\u3002\u4ee5\u4e0b\u306e\u5206\u6790\u7d50\u679c\u306b\u57fa\u3065\u304d\u3001\u7c21\u6f54\u3067\u5b9f\u52d9\u306b\u4f7f\u3048\u308b\u89e3\u8aac\u3092\u65e5\u672c\u8a9e\u3067\u4f5c\u6210\u3057\u3066\u304f\u3060\u3055\u3044\u3002
+
+## \u3053\u306e\u5206\u6790\u3067\u91cd\u8996\u3059\u308b\u8996\u70b9
 - {focus_config['focus']}
 - {focus_config['priority']}
 - {focus_config['actions']}
 
-## 基本情報
-- 分析名: {analysis_name}
-- 総ケース数: {int(ai_context['dashboard_summary'].get('total_cases', 0)):,}
-- 総イベント数: {int(ai_context['dashboard_summary'].get('total_records', 0)):,}
-- 分析期間: {ai_context['period_text']}
-- 平均ケース処理時間: {ai_context['dashboard_summary'].get('avg_case_duration_text', '0s')}
-- 上位10バリアントカバー率: {float(ai_context['dashboard_summary'].get('top10_variant_coverage_pct', 0.0)):.2f}%
+## \u57fa\u672c\u60c5\u5831
+- \u5206\u6790\u540d: {analysis_name}
+- \u30b1\u30fc\u30b9\u6570: {int(ai_context['dashboard_summary'].get('total_cases', 0)):,}
+- \u30a4\u30d9\u30f3\u30c8\u6570: {int(ai_context['dashboard_summary'].get('total_records', 0)):,}
+- \u5206\u6790\u671f\u9593: {ai_context['period_text']}
+- \u5e73\u5747\u30b1\u30fc\u30b9\u51e6\u7406\u6642\u9593: {ai_context['dashboard_summary'].get('avg_case_duration_text', '0s')}
+- \u4e0a\u4f4d10\u30d0\u30ea\u30a2\u30f3\u30c8\u30ab\u30d0\u30fc\u7387: {float(ai_context['dashboard_summary'].get('top10_variant_coverage_pct', 0.0)):.2f}%
 
-## 現在の分析結果上位
+## \u73fe\u5728\u306e\u5206\u6790\u7d50\u679c\u4e0a\u4f4d
 {serialize_ai_prompt_rows(ai_context['analysis_rows'], max_items=7)}
 
-## アクティビティボトルネック
+## \u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u30dc\u30c8\u30eb\u30cd\u30c3\u30af
 {serialize_ai_prompt_rows(ai_context['bottleneck_summary'].get('activity_bottlenecks', []), max_items=5)}
 
-## 遷移ボトルネック
+## \u9077\u79fb\u30dc\u30c8\u30eb\u30cd\u30c3\u30af
 {serialize_ai_prompt_rows(ai_context['bottleneck_summary'].get('transition_bottlenecks', []), max_items=5)}
 
-## 改善インパクト上位
+## \u6539\u5584\u30a4\u30f3\u30d1\u30af\u30c8\u4e0a\u4f4d
 {serialize_ai_prompt_rows(ai_context['impact_summary'].get('rows', []), max_items=5)}
 
-## Root Cause 候補
+## Root Cause \u5019\u88dc
 {serialize_ai_prompt_rows(ai_context['root_cause_summary'].get('rows', []), max_items=5)}
 
-## 主要バリアント
+## \u4e3b\u8981\u30d0\u30ea\u30a2\u30f3\u30c8
 {serialize_ai_prompt_rows(ai_context['variant_items'], max_items=5)}
 
-## ルールベース要点
-{serialize_ai_prompt_rows([item.get('text', '') for item in ai_context['insights_summary'].get('items', [])], max_items=5)}
+## \u30eb\u30fc\u30eb\u30d9\u30fc\u30b9\u8981\u70b9
+{serialize_ai_prompt_rows([item.get('text', '') for item in ai_context['insights_summary'].get('items', [])], max_items=5)}{group_prompt_section}
 
-## 回答形式（必ず以下の4セクションに分けて出力してください）
+## \u56de\u7b54\u5f62\u5f0f\uff08\u5fc5\u305a\u4ee5\u4e0b\u306e4\u30bb\u30af\u30b7\u30e7\u30f3\u306b\u5206\u3051\u3066\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\uff09
+?\u5168\u4f53\u50be\u5411?
+\u5168\u4f53\u306e\u50be\u5411\u30922\u301c3\u6587\u3067\u8981\u7d04\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u6570\u5024\u3092\u305d\u306e\u307e\u307e\u4e26\u3079\u308b\u306e\u3067\u306f\u306a\u304f\u3001\u610f\u5473\u306e\u3042\u308b\u89e3\u91c8\u3092\u542b\u3081\u3066\u304f\u3060\u3055\u3044\u3002
 
-【全体傾向】
-データ全体の傾向を2〜3文で要約してください。具体的な数値（ケース数、イベント数、イベント比率、平均処理時間など）を必ず引用してください。
+?\u6ce8\u76ee\u30dd\u30a4\u30f3\u30c8?
+\u3053\u306e\u5206\u6790\u3067\u7279\u306b\u6ce8\u76ee\u3059\u3079\u304d\u30dd\u30a4\u30f3\u30c8\u30922\u301c3\u70b9\u3001\u7b87\u6761\u66f8\u304d\u3067\u6574\u7406\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u5358\u306a\u308b\u6570\u5024\u306e\u5217\u6319\u3067\u306f\u306a\u304f\u3001\u306a\u305c\u91cd\u8981\u304b\u3082\u7c21\u6f54\u306b\u8ff0\u3079\u3066\u304f\u3060\u3055\u3044\u3002
 
-【注目ポイント】
-この分析で特に注目すべきアクティビティや遷移を2〜3点ピックアップし、数値を交えて考察してください。なぜそれが注目に値するのか（高頻度、長時間、高ばらつき等）を明記してください。
+?\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u793a\u5506?
+\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u5019\u88dc\u30921\u301c2\u70b9\u306b\u7d5e\u3063\u3066\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u5206\u6790\u7d50\u679c\u306b\u57fa\u3065\u304f\u6839\u62e0\u3092\u660e\u793a\u3057\u3001\u78ba\u8a8d\u3059\u3079\u304d\u8981\u56e0\u3092\u793a\u3057\u3066\u304f\u3060\u3055\u3044\u3002
 
-【ボトルネック示唆】
-処理時間・ばらつき・ボトルネックデータの観点からボトルネック候補を1〜2点示唆してください。現場で起こりやすい原因仮説を添え、詳細確認の推奨を含めてください。
-
-【推奨アクション】
-上記の分析結果を踏まえ、次に取るべきアクション・確認すべきポイントを1〜3点、箇条書き（「- 」で始める）で提示してください。
-具体的かつ実行可能なアクションにしてください。「○○を確認する」「○○の分析を実施する」のような形式で、分析結果に基づいた提案にしてください（一般論は避ける）。
-
-専門用語は使いすぎず、現場担当者が読みやすい自然な日本語で書いてください。
+{group_instruction}?\u63a8\u5968\u30a2\u30af\u30b7\u30e7\u30f3?
+\u5206\u6790\u7d50\u679c\u3092\u8e0f\u307e\u3048\u3001\u6b21\u306b\u78ba\u8a8d\u3059\u3079\u304d\u30a2\u30af\u30b7\u30e7\u30f3\u3084\u8ffd\u52a0\u8abf\u67fb\u30921\u301c3\u70b9\u3001\u7b87\u6761\u66f8\u304d\u3067\u63d0\u6848\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u5b9f\u884c\u53ef\u80fd\u3067\u5177\u4f53\u7684\u306a\u5185\u5bb9\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002
 """
 
-
 def extract_recommended_actions_from_text(text):
-    """LLM生成テキストから【推奨アクション】セクションを抽出し、(本文, アクションリスト) を返す。
-
-    【推奨アクション】マーカーが見つかった場合:
-      - マーカーより前のテキストを本文として返す
-      - マーカー以降のテキストを箇条書きとしてパースしリストで返す
-    マーカーが見つからない場合:
-      - テキスト全体を本文、空リストを返す
-    """
-    import re
+    """LLM????????????????????????????"""
     normalized_text = str(text or "").strip()
     if not normalized_text:
         return "", []
 
-    pattern = re.compile(r"^【推奨アクション】\s*$", re.MULTILINE)
-    match = pattern.search(normalized_text)
-    if not match:
+    marker = "?????????"
+    lines = normalized_text.splitlines()
+    marker_index = next(
+        (index for index, line in enumerate(lines) if line.strip() == marker),
+        None,
+    )
+    if marker_index is None:
         return normalized_text, []
 
-    main_text = normalized_text[: match.start()].rstrip()
-    actions_text = normalized_text[match.end() :].strip()
-
+    main_text = "\n".join(lines[:marker_index]).rstrip()
     actions = []
-    for line in actions_text.splitlines():
+    for line in lines[marker_index + 1 :]:
         stripped = line.strip()
         if not stripped:
             continue
-        # 「- 」「• 」「・ 」で始まる行
-        if stripped[0] in "-•・":
-            actions.append(stripped.lstrip("-•・ ").strip())
-        # 「1. 」「2. 」等の番号付き行
-        elif len(stripped) > 1 and stripped[0].isdigit() and stripped[1] in ".、)）":
+        if stripped[0] in "-??":
+            actions.append(stripped.lstrip("-?? ").strip())
+        elif len(stripped) > 1 and stripped[0].isdigit() and stripped[1] in ".)":
             actions.append(stripped[2:].strip())
-        # 「1) 」等の2桁番号にも対応
-        elif len(stripped) > 2 and stripped[:2].isdigit() and stripped[2] in ".、)）":
+        elif len(stripped) > 2 and stripped[:2].isdigit() and stripped[2] in ".)":
             actions.append(stripped[3:].strip())
         else:
-            # マーカー以降の非箇条書きテキストもアクションとして扱う
             actions.append(stripped)
 
-    return main_text, [a for a in actions if a]
-
+    return main_text, [action for action in actions if action]
 
 def build_ai_recommended_actions(ai_context):
-    """分析データに基づいてルールベースの推奨アクションを生成する。
-
-    条件を上から順に判定し、該当するもの（最大3つ）を返す。
-    該当が0件の場合はデフォルト文を返す。
-    """
+    """??????????????????????????????"""
     analysis_key = str(ai_context["analysis_key"]).strip().lower()
     bottleneck_summary = ai_context["bottleneck_summary"]
     analysis_rows = ai_context["analysis_rows"]
@@ -197,76 +202,177 @@ def build_ai_recommended_actions(ai_context):
         if bottleneck_summary.get("activity_bottlenecks")
         else None
     )
-    top_transition_bottleneck = (
-        bottleneck_summary["transition_bottlenecks"][0]
-        if bottleneck_summary.get("transition_bottlenecks")
-        else None
-    )
-    top_impact_row = (
-        impact_summary["rows"][0] if impact_summary.get("rows") else None
-    )
+    top_impact_row = impact_summary["rows"][0] if impact_summary.get("rows") else None
 
     actions = []
 
-    # 条件1: 処理時間の標準偏差が大きいアクティビティがある
     if top_activity_bottleneck:
-        activity_name = top_activity_bottleneck.get("activity", "不明")
+        activity_name = top_activity_bottleneck.get("activity", "\u4e0d\u660e")
         std_min = top_activity_bottleneck.get("std_duration_min", 0)
         avg_min = top_activity_bottleneck.get("avg_duration_min", 0)
         if std_min and avg_min and float(std_min) > float(avg_min) * 0.5:
             actions.append(
-                f"「{activity_name}」の処理時間にばらつきがあります。"
-                f"ケースごとのドリルダウンで原因を確認することを推奨します。"
+                f"\u300c{activity_name}\u300d\u306e\u51e6\u7406\u6642\u9593\u306b\u3070\u3089\u3064\u304d\u304c\u3042\u308a\u307e\u3059\u3002"
+                f"\u30b1\u30fc\u30b9\u3054\u3068\u306e\u30c9\u30ea\u30eb\u30c0\u30a6\u30f3\u3067\u539f\u56e0\u3092\u78ba\u8a8d\u3059\u308b\u3053\u3068\u3092\u63a8\u5968\u3057\u307e\u3059\u3002"
             )
 
-    # 条件2: 上位3アクティビティのカバー率が80%以上（frequency分析時）
     if analysis_key == "frequency" and len(analysis_rows) >= 3:
         top3_ratio_sum = sum(
-            float(row.get("イベント比率(%)", 0) or 0)
+            float(row.get("\u30a4\u30d9\u30f3\u30c8\u6bd4\u7387(%)", row.get("event_ratio_pct", 0)) or 0)
             for row in analysis_rows[:3]
         )
         if top3_ratio_sum >= 80:
             actions.append(
-                "上位アクティビティへの集中度が高いため、"
-                "これらの効率化が全体改善に直結します。"
-                "前後処理分析で遷移パターンを確認してください。"
+                "\u4e0a\u4f4d\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u3078\u306e\u96c6\u4e2d\u5ea6\u304c\u9ad8\u3044\u305f\u3081\u3001"
+                "\u3053\u308c\u3089\u306e\u52b9\u7387\u5316\u304c\u5168\u4f53\u6539\u5584\u306b\u76f4\u7d50\u3057\u307e\u3059\u3002"
+                "\u524d\u5f8c\u51e6\u7406\u5206\u6790\u3067\u9077\u79fb\u30d1\u30bf\u30fc\u30f3\u3092\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
             )
 
-    # 条件3: 平均処理時間が突出しているアクティビティがある
     if top_activity_bottleneck:
-        activity_name = top_activity_bottleneck.get("activity", "不明")
+        activity_name = top_activity_bottleneck.get("activity", "\u4e0d\u660e")
         avg_min = float(top_activity_bottleneck.get("avg_duration_min", 0) or 0)
-        dashboard_avg_text = ai_context["dashboard_summary"].get(
-            "avg_case_duration_min", 0
+        dashboard_avg = float(
+            ai_context["dashboard_summary"].get("avg_case_duration_min", 0) or 0
         )
-        dashboard_avg = float(dashboard_avg_text or 0)
         if dashboard_avg > 0 and avg_min >= dashboard_avg * 3:
             actions.append(
-                f"「{activity_name}」の処理時間が突出しています。"
-                f"当該アクティビティのケース明細を確認し、"
-                f"外れ値や特殊ケースの有無を調査してください。"
+                f"\u300c{activity_name}\u300d\u306e\u51e6\u7406\u6642\u9593\u304c\u7a81\u51fa\u3057\u3066\u3044\u307e\u3059\u3002"
+                f"\u5f53\u8a72\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u306e\u30b1\u30fc\u30b9\u660e\u7d30\u3092\u78ba\u8a8d\u3057\u3001"
+                f"\u5916\u308c\u5024\u3084\u7279\u6b8a\u30b1\u30fc\u30b9\u306e\u6709\u7121\u3092\u8abf\u67fb\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
             )
 
-    # 条件4: 改善インパクトが高い遷移がある（transition / その他分析時）
     if top_impact_row and analysis_key != "frequency":
-        transition_label = top_impact_row.get("transition_label", "不明")
+        transition_label = top_impact_row.get("transition_label", "\u4e0d\u660e")
         actions.append(
-            f"改善インパクトが高い遷移「{transition_label}」を優先して、"
-            f"承認待ち・差戻し等の内訳を確認してください。"
+            f"\u6539\u5584\u30a4\u30f3\u30d1\u30af\u30c8\u304c\u9ad8\u3044\u9077\u79fb\u300c{transition_label}\u300d\u3092\u512a\u5148\u3057\u3066\u3001"
+            f"\u627f\u8a8d\u5f85\u3061\u30fb\u5dee\u623b\u3057\u7b49\u306e\u5185\u8a33\u3092\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
         )
 
-    # 最大3つに制限
+    group_summary = ai_context.get("group_summary", [])
+    group_rows = [
+        row
+        for row in group_summary
+        if str(row.get("value") or row.get("\u5024") or "") != "\u5168\u4f53"
+    ]
+    if len(group_rows) >= 2:
+        value_key = next(
+            (key for key in ["value", "\u5024"] if key in group_rows[0]),
+            "value",
+        )
+        avg_duration_key = next(
+            (
+                key
+                for key in ["avg_case_duration_min", "\u5e73\u5747\u51e6\u7406\u6642\u9593(\u5206)", "avg_duration_min"]
+                if key in group_rows[0]
+            ),
+            None,
+        )
+        if avg_duration_key:
+            sorted_groups = sorted(
+                group_rows,
+                key=lambda row: float(row.get(avg_duration_key, 0) or 0),
+                reverse=True,
+            )
+            max_group = sorted_groups[0]
+            min_group = sorted_groups[-1]
+            max_dur = float(max_group.get(avg_duration_key, 0) or 0)
+            min_dur = float(min_group.get(avg_duration_key, 0) or 0)
+            if min_dur > 0 and max_dur / min_dur >= 1.3:
+                actions.append(
+                    f"\u30b0\u30eb\u30fc\u30d7\u300c{max_group.get(value_key, '\u4e0d\u660e')}\u300d\u306e\u5e73\u5747\u51e6\u7406\u6642\u9593\u304c"
+                    f"\u4ed6\u30b0\u30eb\u30fc\u30d7\u3088\u308a\u9577\u3044\u305f\u3081\u3001\u5f53\u8a72\u30b0\u30eb\u30fc\u30d7\u306e\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u8981\u56e0\u3092"
+                    f"\u30c9\u30ea\u30eb\u30c0\u30a6\u30f3\u3067\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044\u3002"
+                )
+
     actions = actions[:3]
 
-    # デフォルト: 該当なしの場合
     if not actions:
         actions.append(
-            "前後処理分析やバリアント分析で、"
-            "プロセス全体の流れを確認することを推奨します。"
+            "\u524d\u5f8c\u51e6\u7406\u5206\u6790\u3084\u30d0\u30ea\u30a2\u30f3\u30c8\u5206\u6790\u3067\u3001"
+            "\u30d7\u30ed\u30bb\u30b9\u5168\u4f53\u306e\u6d41\u308c\u3092\u78ba\u8a8d\u3059\u308b\u3053\u3068\u3092\u63a8\u5968\u3057\u307e\u3059\u3002"
         )
 
     return actions
 
+def _build_group_comparison_lines(group_summary):
+    """group_summary ???????????????????????????"""
+    if not group_summary:
+        return []
+
+    group_rows = []
+    for row in group_summary:
+        value = row.get("value") or row.get("\u5024") or ""
+        if str(value) == "\u5168\u4f53":
+            continue
+        group_rows.append(row)
+
+    if len(group_rows) < 2:
+        return []
+
+    case_key = next(
+        (key for key in ["case_count", "\u30b1\u30fc\u30b9\u6570"] if key in group_rows[0]),
+        None,
+    )
+    avg_duration_key = next(
+        (
+            key
+            for key in ["avg_case_duration_min", "\u5e73\u5747\u51e6\u7406\u6642\u9593(\u5206)", "avg_duration_min"]
+            if key in group_rows[0]
+        ),
+        None,
+    )
+    value_key = next(
+        (key for key in ["value", "\u5024"] if key in group_rows[0]),
+        "value",
+    )
+
+    lines = [
+        "",
+        "?\u30b0\u30eb\u30fc\u30d7\u9593\u6bd4\u8f03?",
+        f"{len(group_rows)}\u30b0\u30eb\u30fc\u30d7\u3092\u6bd4\u8f03\u3057\u305f\u7d50\u679c:",
+    ]
+
+    if case_key:
+        sorted_by_case = sorted(
+            group_rows,
+            key=lambda row: float(row.get(case_key, 0) or 0),
+            reverse=True,
+        )
+        max_group = sorted_by_case[0]
+        min_group = sorted_by_case[-1]
+        lines.append(
+            f"- \u30b1\u30fc\u30b9\u6570\u304c\u6700\u3082\u591a\u3044\u306e\u306f\u300c{max_group.get(value_key, '\u4e0d\u660e')}\u300d"
+            f"\uff08{int(float(max_group.get(case_key, 0) or 0)):,}\u4ef6\uff09\u3001"
+            f"\u6700\u3082\u5c11\u306a\u3044\u306e\u306f\u300c{min_group.get(value_key, '\u4e0d\u660e')}\u300d"
+            f"\uff08{int(float(min_group.get(case_key, 0) or 0)):,}\u4ef6\uff09\u3067\u3059\u3002"
+        )
+
+    if avg_duration_key:
+        sorted_by_duration = sorted(
+            group_rows,
+            key=lambda row: float(row.get(avg_duration_key, 0) or 0),
+            reverse=True,
+        )
+        max_dur_group = sorted_by_duration[0]
+        min_dur_group = sorted_by_duration[-1]
+        max_dur = float(max_dur_group.get(avg_duration_key, 0) or 0)
+        min_dur = float(min_dur_group.get(avg_duration_key, 0) or 0)
+        if max_dur > 0:
+            lines.append(
+                f"- \u5e73\u5747\u51e6\u7406\u6642\u9593\u304c\u6700\u3082\u9577\u3044\u30b0\u30eb\u30fc\u30d7\u306f\u300c{max_dur_group.get(value_key, '\u4e0d\u660e')}\u300d"
+                f"\uff08{max_dur:.1f}\u5206\uff09\u3001\u6700\u3082\u77ed\u3044\u306e\u306f\u300c{min_dur_group.get(value_key, '\u4e0d\u660e')}\u300d"
+                f"\uff08{min_dur:.1f}\u5206\uff09\u3067\u3059\u3002"
+            )
+            if min_dur > 0 and max_dur / min_dur >= 1.5:
+                lines.append(
+                    f"- \u4e21\u8005\u306e\u5dee\u306f\u7d04{max_dur - min_dur:.1f}\u5206\uff08{max_dur / min_dur:.1f}\u500d\uff09\u3042\u308a\u3001"
+                    f"\u30b0\u30eb\u30fc\u30d7\u56fa\u6709\u306e\u8981\u56e0\u3092\u78ba\u8a8d\u3059\u308b\u3053\u3068\u3092\u63a8\u5968\u3057\u307e\u3059\u3002"
+                )
+
+    if not any(line.startswith("- ") for line in lines):
+        lines.append("- \u30b0\u30eb\u30fc\u30d7\u9593\u3067\u9855\u8457\u306a\u5dee\u306f\u691c\u51fa\u3055\u308c\u307e\u305b\u3093\u3067\u3057\u305f\u3002")
+
+    return lines
 
 def build_ai_fallback_text(ai_context):
     analysis_key = str(ai_context["analysis_key"]).strip().lower()
@@ -292,182 +398,173 @@ def build_ai_fallback_text(ai_context):
         top_transition_bottleneck
     )
     top_row = analysis_rows[0] if analysis_rows else {}
+    group_comparison_lines = _build_group_comparison_lines(
+        ai_context.get("group_summary", [])
+    )
 
     if analysis_key == "frequency":
-        # 全体傾向
         if top_row:
             overall_trend_text = (
-                f"最も頻度の高いアクティビティは「{top_row.get('アクティビティ', '不明')}」"
-                f"（{normalize_excel_cell_value(top_row.get('イベント件数', 0))} 件、"
-                f"イベント比率 {normalize_excel_cell_value(top_row.get('イベント比率(%)', 0))}%）です。"
+                f"????????????????{top_row.get('???????', '??')}?"
+                f"?{normalize_excel_cell_value(top_row.get('??????', 0))} ??"
+                f"?????? {normalize_excel_cell_value(top_row.get('??????(%)', 0))}%????"
             )
         else:
-            overall_trend_text = "件数集中の中心アクティビティは特定できませんでした。"
+            overall_trend_text = "??????????????????????????"
 
-        # 注目ポイント
         attention_lines = []
         if top_row:
             attention_lines.append(
-                f"- 「{top_row.get('アクティビティ', '不明')}」に件数が集中しており、"
-                f"受付経路や担当者別件数の比較を推奨します。"
+                f"- ?{top_row.get('???????', '??')}????????????"
+                f"?????????????????????"
             )
         if top_activity_bottleneck:
             attention_lines.append(
-                f"- 「{top_activity_bottleneck['activity']}」は平均処理時間が長く、"
-                f"処理時間のばらつきにも注意が必要です。"
+                f"- ?{top_activity_bottleneck['activity']}????????????"
+                f"???????????????????"
             )
         if not attention_lines:
-            attention_lines.append("- 特に注目すべきアクティビティは検出されませんでした。")
+            attention_lines.append("- ??????????????????????????")
 
-        # ボトルネック示唆
         bottleneck_lines = []
         if top_activity_bottleneck:
             bottleneck_lines.append(
-                f"- アクティビティ「{top_activity_bottleneck['activity']}」が"
-                f"処理時間の観点でボトルネック候補です。"
-                f"前後の入力不備や差戻しが原因の可能性があります。"
+                f"- ????????{top_activity_bottleneck['activity']}??"
+                f"???????????????????"
+                f"????????????????????????"
             )
         if top_transition_bottleneck_label:
             bottleneck_lines.append(
-                f"- 遷移「{top_transition_bottleneck_label}」も滞留が見られます。"
-                f"ケースごとのドリルダウンでの確認を推奨します。"
+                f"- ???{top_transition_bottleneck_label}???????????"
+                f"???????????????????????"
             )
         if not bottleneck_lines:
             bottleneck_lines.append(
-                "- 明確なボトルネックは検出されませんでした。"
-                "前後処理分析での確認を推奨します。"
+                "- ?????????????????????"
+                "?????????????????"
             )
 
     elif analysis_key == "transition":
-        # 全体傾向
         if top_transition_bottleneck_label:
             overall_trend_text = (
-                f"最も優先度が高い遷移候補は「{top_transition_bottleneck_label}」です。"
+                f"??????????????{top_transition_bottleneck_label}????"
             )
         else:
-            overall_trend_text = "優先度が高い遷移候補は特定できませんでした。"
+            overall_trend_text = "??????????????????????"
 
-        # 注目ポイント
         attention_lines = []
         if top_transition_bottleneck_label:
             attention_lines.append(
-                f"- 「{top_transition_bottleneck_label}」の前後で、"
-                f"承認待ちや引き継ぎ待ちの内訳に注目してください。"
+                f"- ?{top_transition_bottleneck_label}??????"
+                f"????????????????????????"
             )
         if top_impact_row:
             attention_lines.append(
-                f"- 改善インパクトが高い「{top_impact_row['transition_label']}」は"
-                f"優先的な改善対象です。"
+                f"- ???????????{top_impact_row['transition_label']}??"
+                f"???????????"
             )
         if not attention_lines:
-            attention_lines.append("- 特に注目すべき遷移は検出されませんでした。")
+            attention_lines.append("- ?????????????????????")
 
-        # ボトルネック示唆
         bottleneck_lines = []
         if top_transition_bottleneck_label:
             bottleneck_lines.append(
-                f"- 遷移「{top_transition_bottleneck_label}」が滞留のボトルネック候補です。"
-                f"承認待ち・バッチ処理・手作業の受け渡しが原因の可能性があります。"
+                f"- ???{top_transition_bottleneck_label}????????????????"
+                f"????????????????????????????????"
             )
         if top_impact_row:
             bottleneck_lines.append(
-                f"- 改善インパクト分析では「{top_impact_row['transition_label']}」が上位です。"
-                f"差戻しや再提出を含む遷移を優先して確認してください。"
+                f"- ????????????{top_impact_row['transition_label']}???????"
+                f"??????????????????????????"
             )
         if not bottleneck_lines:
             bottleneck_lines.append(
-                "- 明確なボトルネック遷移は検出されませんでした。"
-                "パターン分析での確認を推奨します。"
+                "- ???????????????????????"
+                "?????????????????"
             )
 
     elif analysis_key == "pattern":
-        # 全体傾向
         if top_row:
             overall_trend_text = (
-                f"最頻出パターンは「{top_row.get('処理順パターン', top_row.get('パターン', '不明'))}」です。"
+                f"?????????{top_row.get('???????', top_row.get('????', '??'))}????"
             )
         else:
-            overall_trend_text = "標準ルートは特定できませんでした。"
+            overall_trend_text = "?????????????????"
 
-        # 注目ポイント
         attention_lines = [
-            "- 最頻出パターンと時間が長い例外パターンを比較し、分岐条件を整理してください。",
-            "- 差戻しや再提出を含むパターンは、標準ルートへ寄せられるか確認を推奨します。",
+            "- ??????????????????????????????????????",
+            "- ?????????????????????????????????????",
         ]
 
-        # ボトルネック示唆
         bottleneck_lines = []
         if top_activity_bottleneck:
             bottleneck_lines.append(
-                f"- アクティビティ「{top_activity_bottleneck['activity']}」が"
-                f"例外パターンのボトルネック候補です。"
+                f"- ????????{top_activity_bottleneck['activity']}??"
+                f"??????????????????"
             )
         bottleneck_lines.append(
-            "- 繰り返し率が高いパターンは手戻りが多く、"
-            "一次判定や入力チェックの前倒しを検討してください。"
+            "- ????????????????????"
+            "?????????????????????????"
         )
 
     else:
-        # 全体傾向
         if top_impact_row:
             overall_trend_text = (
-                f"改善インパクト最大の遷移は「{top_impact_row['transition_label']}」で、"
-                f"平均所要時間は {top_impact_row['avg_duration_text']} です。"
+                f"??????????????{top_impact_row['transition_label']}???"
+                f"??????? {top_impact_row['avg_duration_text']} ???"
             )
         else:
-            overall_trend_text = "改善インパクト上位の遷移は検出されませんでした。"
+            overall_trend_text = "????????????????????????"
 
-        # 注目ポイント
         attention_lines = []
         if top_transition_bottleneck_label:
             attention_lines.append(
-                f"- 「{top_transition_bottleneck_label}」の前後で、"
-                f"担当待ち・承認待ち・差戻し理由の内訳を確認してください。"
+                f"- ?{top_transition_bottleneck_label}??????"
+                f"????????????????????????????"
             )
         if top_activity_bottleneck:
             attention_lines.append(
-                f"- アクティビティ「{top_activity_bottleneck['activity']}」について、"
-                f"担当者別の件数と平均所要時間を比較してください。"
+                f"- ????????{top_activity_bottleneck['activity']}??????"
+                f"????????????????????????"
             )
         if not attention_lines:
             attention_lines.append(
-                "- 上位パターンと例外パターンを比較し、分岐ポイントを確認してください。"
+                "- ??????????????????????????????????"
             )
 
-        # ボトルネック示唆
         bottleneck_lines = []
         if top_transition_bottleneck_label:
             bottleneck_lines.append(
-                f"- 遷移「{top_transition_bottleneck_label}」が滞留のボトルネック候補です。"
+                f"- ???{top_transition_bottleneck_label}????????????????"
             )
         if top_activity_bottleneck:
             bottleneck_lines.append(
-                f"- アクティビティ「{top_activity_bottleneck['activity']}」も処理時間が長く注意が必要です。"
+                f"- ????????{top_activity_bottleneck['activity']}?????????????????"
             )
         if not bottleneck_lines:
             bottleneck_lines.append(
-                "- 改善インパクトが高い遷移を優先して、滞留の主因を確認してください。"
+                "- ?????????????????????????????????"
             )
 
     return "\n".join(
         [
-            "【全体傾向】",
+            "??????",
             (
-                f"{analysis_name} を中心に確認すると、対象は "
-                f"{int(dashboard_summary.get('total_cases', 0)):,} ケース / "
-                f"{int(dashboard_summary.get('total_records', 0)):,} イベントです。"
+                f"{analysis_name} ????????????? "
+                f"{int(dashboard_summary.get('total_cases', 0)):,} ??? / "
+                f"{int(dashboard_summary.get('total_records', 0)):,} ???????"
             ),
-            f"分析期間は {period_text} です。",
+            f"????? {period_text} ???",
             overall_trend_text,
             "",
-            "【注目ポイント】",
+            "????????",
             *attention_lines,
             "",
-            "【ボトルネック示唆】",
+            "??????????",
             *bottleneck_lines,
+            *group_comparison_lines,
         ]
     )
-
 
 def build_empty_ai_summary(analysis_key, analysis_name):
     return {
@@ -517,6 +614,8 @@ def build_ai_context_summary(
     insights_summary=None,
     variant_items=None,
     analysis_name=None,
+    group_columns=None,
+    group_summary=None,
 ):
     normalized_analysis_key = str(analysis_key or "").strip().lower()
     analysis_definitions = get_available_analysis_definitions()
@@ -616,6 +715,8 @@ def build_ai_context_summary(
         ),
         "period_text": period_text,
         "insights_summary": resolved_insights_summary,
+        "group_columns": group_columns or [],
+        "group_summary": group_summary or [],
     }
 
 
@@ -636,6 +737,8 @@ def build_ai_insights_summary(
     force_refresh=False,
     use_cache=True,
     generate_text=None,
+    group_columns=None,
+    group_summary=None,
 ):
     cache_key = (
         str(analysis_key or "").strip().lower(),
@@ -665,6 +768,8 @@ def build_ai_insights_summary(
         insights_summary=insights_summary,
         variant_items=variant_items,
         analysis_name=analysis_name,
+        group_columns=group_columns,
+        group_summary=group_summary,
     )
     generated_at = datetime.now(timezone.utc).isoformat()
     fallback_text = build_ai_fallback_text(ai_context)
@@ -774,6 +879,8 @@ def build_excel_ai_summary(
     variant_items=None,
     use_cache=True,
     generate_text=None,
+    group_columns=None,
+    group_summary=None,
 ):
     return build_ai_insights_summary(
         run_data=run_data,
@@ -792,4 +899,6 @@ def build_excel_ai_summary(
         force_refresh=False,
         use_cache=use_cache,
         generate_text=generate_text,
+        group_columns=group_columns,
+        group_summary=group_summary,
     )
