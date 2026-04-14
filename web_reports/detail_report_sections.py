@@ -1,8 +1,5 @@
-﻿from io import BytesIO
-from datetime import datetime, timezone
-import duckdb
+﻿import duckdb
 
-from openpyxl import Workbook
 from openpyxl.chart import BarChart, PieChart, Reference
 from openpyxl.chart.data_source import AxDataSource, StrRef
 from openpyxl.chart.label import DataLabelList
@@ -10,10 +7,7 @@ from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 
 from web_reports.excel_common import (
-    ANALYSIS_PRECONDITIONS_TEXT,
-    APPLIED_FILTERS_NOTE_TEXT,
     EXCEL_ALT_ROW_FILL,
-    EXCEL_ASSUMPTION_SECTION_FILL,
     EXCEL_BODY_FONT,
     EXCEL_BOLD_FONT,
     EXCEL_GROUP_SECTION_FILL,
@@ -21,33 +15,13 @@ from web_reports.excel_common import (
     EXCEL_HEADER_FILL,
     EXCEL_LABEL_FILL,
     EXCEL_MUTED_FONT,
-    EXCEL_MUTED_SECTION_FILL,
-    EXCEL_NOTE_FONT,
-    EXCEL_SECTION_FILL,
-    EXCEL_SUBTITLE_FILL,
-    EXCEL_TEXT_BLOCK_FILL,
     EXCEL_THIN_BORDER,
-    EXCEL_TITLE_BORDER,
-    EXCEL_TITLE_FILL,
-    EXCEL_TITLE_FONT,
-    GROUPING_CONDITION_NOTE_TEXT,
-    LOG_DIAGNOSTIC_SHEET_NAMES,
     REPORT_HEADER_LABELS,
-    REPORT_SHEET_NAMES,
-    TERMINOLOGY_ROWS,
-    append_bullet_rows,
-    append_custom_text_section_to_worksheet,
-    append_definition_table_to_worksheet,
     append_key_value_rows,
     append_table_to_worksheet,
-    append_text_block_to_worksheet,
-    autosize_worksheet_columns,
-    build_analysis_excel_file_name,
-    estimate_wrapped_row_height,
     initialize_excel_worksheet,
     merge_excel_row,
     normalize_excel_cell_value,
-    resolve_analysis_display_name,
     sanitize_workbook_sheet_name,
     style_excel_cell,
 )
