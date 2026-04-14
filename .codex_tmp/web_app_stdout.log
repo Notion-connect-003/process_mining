@@ -1,0 +1,10 @@
+INFO:     127.0.0.1:55082 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55085 - "POST /api/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55086 - "GET /api/runs/44121ae60d7e4a8ea6abbd63d62f9485/ai-insights/frequency HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55087 - "POST /api/runs/44121ae60d7e4a8ea6abbd63d62f9485/ai-insights/frequency?force_refresh=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52740 - "GET /api/runs/44121ae60d7e4a8ea6abbd63d62f9485/ai-insights/pattern HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52741 - "POST /api/runs/44121ae60d7e4a8ea6abbd63d62f9485/ai-insights/pattern?force_refresh=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59417 - "GET /api/runs/7784b9ed33234164bfe2820ccd1fe769/ai-insights/frequency HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59418 - "GET /api/runs/7784b9ed33234164bfe2820ccd1fe769/ai-insights/pattern HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59423 - "GET /api/runs/44121ae60d7e4a8ea6abbd63d62f9485/ai-insights/frequency HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59425 - "GET /api/runs/44121ae60d7e4a8ea6abbd63d62f9485/ai-insights/pattern HTTP/1.1" 200 OK

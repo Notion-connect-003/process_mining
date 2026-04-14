@@ -13,6 +13,8 @@ ANALYSIS_CONFIG = {
         "overall_impact_pct": "全体影響度(%)",
         "fastest_pattern_flag": "最短処理",
         "simple_comment": "簡易コメント",
+        "step_count": "ステップ数",
+        "repeated_activities": "繰り返しアクティビティ",
         "case_count": "ケース数",
         "case_ratio_pct": "ケース比率(%)",
         "cumulative_case_ratio_pct": "累積カバー率(%)",
@@ -43,6 +45,8 @@ PATTERN_ORDERED_COLUMNS = [
     "overall_impact_pct",
     "fastest_pattern_flag",
     "simple_comment",
+    "step_count",
+    "repeated_activities",
     "case_count",
     "case_ratio_pct",
     "cumulative_case_ratio_pct",
@@ -76,6 +80,23 @@ def _count_repeated_steps(pattern):
     if not steps:
         return 0
     return max(0, len(steps) - len(set(steps)))
+
+
+def _count_steps(pattern):
+    """パターン内のステップ数（アクティビティ数）を返す。"""
+    return len(_split_pattern(pattern))
+
+
+def _find_repeated_activities(pattern):
+    """パターン内で繰り返されているアクティビティ名をカンマ区切りで返す。"""
+    steps = _split_pattern(pattern)
+    if not steps:
+        return ""
+    from collections import Counter
+
+    counts = Counter(steps)
+    repeated = sorted(name for name, count in counts.items() if count >= 2)
+    return ", ".join(repeated)
 
 
 def _calculate_repeat_rate_pct(pattern):
@@ -142,6 +163,10 @@ def enrich_pattern_analysis_result(result_df, group_columns=None):
         enriched_df["avg_case_duration_min"].fillna(float("inf")).min()
         if "avg_case_duration_min" in enriched_df.columns
         else float("inf")
+    )
+    enriched_df["step_count"] = enriched_df["pattern"].apply(_count_steps)
+    enriched_df["repeated_activities"] = enriched_df["pattern"].apply(
+        _find_repeated_activities
     )
     enriched_df["repeat_flag"] = enriched_df["pattern"].apply(
         lambda pattern: "○" if _has_repeated_step(pattern) else ""

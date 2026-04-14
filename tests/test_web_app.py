@@ -528,6 +528,8 @@ class WebAppTestCase(unittest.TestCase):
         self.assertIn("90%点ケース処理時間(分)", pattern_headers)
         self.assertIn("95%点ケース処理時間(分)", pattern_headers)
         self.assertIn("簡易コメント", pattern_headers)
+        self.assertIn("ステップ数", pattern_headers)
+        self.assertIn("繰り返しアクティビティ", pattern_headers)
         self.assertIn("パターン", pattern_headers)
         comment_column_index = pattern_headers.index("簡易コメント") + 1
         comment_column_letter = get_column_letter(comment_column_index)
@@ -2018,6 +2020,10 @@ class WebAppTestCase(unittest.TestCase):
 
         pattern_rows = get_terminology_rows("pattern")
         self.assertTrue(any(row["用語"] == "処理順パターン" for row in pattern_rows))
+        self.assertTrue(any(row["用語"] == "累積カバー率(%)" for row in pattern_rows))
+        self.assertTrue(any(row["用語"] == "繰り返し率(%)" for row in pattern_rows))
+        self.assertTrue(any(row["用語"] == "改善優先度スコア" for row in pattern_rows))
+        self.assertTrue(any(row["用語"] == "全体影響度(%)" for row in pattern_rows))
 
         unknown_rows = get_terminology_rows("unknown")
         self.assertEqual(4, len(unknown_rows))
@@ -2043,6 +2049,8 @@ class WebAppTestCase(unittest.TestCase):
             "全体影響度(%)",
             "最短処理",
             "簡易コメント",
+            "ステップ数",
+            "繰り返しアクティビティ",
             "累積カバー率(%)",
             "標準偏差ケース処理時間(分)",
             "75%点ケース処理時間(分)",
@@ -2050,6 +2058,8 @@ class WebAppTestCase(unittest.TestCase):
             "95%点ケース処理時間(分)",
         ):
             self.assertIn(col, first_row, f"列 '{col}' が処理順パターン分析の結果に存在しません。")
+        self.assertGreater(first_row["ステップ数"], 0)
+        self.assertIsInstance(first_row["繰り返しアクティビティ"], str)
 
     def test_pattern_analysis_assigns_repeat_flags_and_evaluations(self):
         csv_text = "\n".join([
@@ -2088,6 +2098,8 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual("0〜10%", pattern_by_route["受付→確認→完了"]["繰り返し率区分"])
         self.assertEqual("", pattern_by_route["受付→確認→完了"]["確認区分"])
         self.assertEqual("○", pattern_by_route["受付→確認→完了"]["最短処理"])
+        self.assertEqual(3, pattern_by_route["受付→確認→完了"]["ステップ数"])
+        self.assertEqual("", pattern_by_route["受付→確認→完了"]["繰り返しアクティビティ"])
         self.assertEqual(50.0, pattern_by_route["受付→確認→完了"]["累積カバー率(%)"])
         self.assertLess(float(pattern_by_route["受付→確認→完了"]["平均処理時間差分(分)"]), 0)
         self.assertEqual(0.0, float(pattern_by_route["受付→確認→完了"]["改善優先度スコア"]))
@@ -2097,6 +2109,8 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual(20.0, pattern_by_route["受付→確認→差戻し→確認→完了"]["繰り返し率(%)"])
         self.assertEqual("10〜30%", pattern_by_route["受付→確認→差戻し→確認→完了"]["繰り返し率区分"])
         self.assertEqual("", pattern_by_route["受付→確認→差戻し→確認→完了"]["確認区分"])
+        self.assertEqual(5, pattern_by_route["受付→確認→差戻し→確認→完了"]["ステップ数"])
+        self.assertEqual("確認", pattern_by_route["受付→確認→差戻し→確認→完了"]["繰り返しアクティビティ"])
         self.assertGreater(float(pattern_by_route["受付→確認→差戻し→確認→完了"]["平均処理時間差分(分)"]), 0)
         self.assertGreater(float(pattern_by_route["受付→確認→差戻し→確認→完了"]["改善優先度スコア"]), 0)
         self.assertGreaterEqual(float(pattern_by_route["受付→確認→差戻し→確認→完了"]["全体影響度(%)"]), 0)
@@ -2106,6 +2120,8 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual(0.0, pattern_by_route["受付→確認→保留→再確認→承認→完了"]["繰り返し率(%)"])
         self.assertEqual("0〜10%", pattern_by_route["受付→確認→保留→再確認→承認→完了"]["繰り返し率区分"])
         self.assertEqual("", pattern_by_route["受付→確認→保留→再確認→承認→完了"]["確認区分"])
+        self.assertEqual(6, pattern_by_route["受付→確認→保留→再確認→承認→完了"]["ステップ数"])
+        self.assertEqual("", pattern_by_route["受付→確認→保留→再確認→承認→完了"]["繰り返しアクティビティ"])
         self.assertGreater(float(pattern_by_route["受付→確認→保留→再確認→承認→完了"]["平均処理時間差分(分)"]), 0)
         self.assertEqual(0.0, float(pattern_by_route["受付→確認→保留→再確認→承認→完了"]["改善優先度スコア"]))
         self.assertIn("平均超過", pattern_by_route["受付→確認→保留→再確認→承認→完了"]["簡易コメント"])

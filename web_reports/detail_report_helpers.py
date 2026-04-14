@@ -167,6 +167,10 @@ def build_pattern_overview_rows(pattern_rows, variant_items, pattern_column_labe
     overall_impact_pct_label = pattern_display_columns.get("overall_impact_pct", "全体影響度(%)")
     fastest_pattern_flag_label = pattern_display_columns.get("fastest_pattern_flag", "最短処理")
     simple_comment_label = pattern_display_columns.get("simple_comment", "簡易コメント")
+    step_count_label = pattern_display_columns.get("step_count", "ステップ数")
+    repeated_activities_label = pattern_display_columns.get(
+        "repeated_activities", "繰り返しアクティビティ"
+    )
     case_count_label = pattern_display_columns.get("case_count", "ケース数")
     case_ratio_label = pattern_display_columns.get("case_ratio_pct", "ケース比率(%)")
     cumulative_case_ratio_label = pattern_display_columns.get("cumulative_case_ratio_pct", "累積カバー率(%)")
@@ -205,6 +209,8 @@ def build_pattern_overview_rows(pattern_rows, variant_items, pattern_column_labe
                 "overall_impact_pct": pattern_row.get(overall_impact_pct_label, 0),
                 "fastest_pattern_flag": pattern_row.get(fastest_pattern_flag_label, ""),
                 "simple_comment": pattern_row.get(simple_comment_label, ""),
+                "step_count": pattern_row.get(step_count_label, 0),
+                "repeated_activities": pattern_row.get(repeated_activities_label, ""),
                 "count": pattern_row.get(case_count_label, 0),
                 "ratio": pattern_row.get(case_ratio_label, 0),
                 "cumulative_case_ratio_pct": pattern_row.get(cumulative_case_ratio_label, 0),
