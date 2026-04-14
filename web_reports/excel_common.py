@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 import unicodedata
 
 import pandas as pd
@@ -900,3 +900,4 @@ def append_structured_text_block_to_worksheet(
             current_row += 1
 
     return current_row + 1
+

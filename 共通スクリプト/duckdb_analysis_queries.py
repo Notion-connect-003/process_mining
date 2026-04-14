@@ -1,4 +1,4 @@
-import duckdb
+﻿import duckdb
 import pandas as pd
 
 from 共通スクリプト.duckdb_core import *
@@ -268,6 +268,10 @@ def query_frequency_analysis_df(parquet_path, filter_params=None, filter_column_
             activity,
             COUNT(*) AS event_count,
             COUNT(DISTINCT case_id) AS case_count,
+            ROUND(
+                COUNT(DISTINCT case_id) * 100.0 / NULLIF((SELECT COUNT(DISTINCT case_id) FROM {relation_name}), 0),
+                2
+            ) AS case_ratio_pct,
             ROUND(SUM(duration_min), 2) AS total_duration_min,
             ROUND(AVG(duration_min), 2) AS avg_duration_min,
             ROUND(MEDIAN(duration_min), 2) AS median_duration_min,

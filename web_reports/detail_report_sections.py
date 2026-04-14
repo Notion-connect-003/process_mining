@@ -155,6 +155,10 @@ def _iter_groups_from_parquet(
                     activity,
                     COUNT(*) AS event_count,
                     COUNT(DISTINCT case_id) AS case_count,
+                    ROUND(
+                        COUNT(DISTINCT case_id) * 100.0 / NULLIF((SELECT COUNT(DISTINCT case_id) FROM group_scoped), 0),
+                        2
+                    ) AS case_ratio_pct,
                     ROUND(SUM(duration_min), 2) AS total_duration_min,
                     ROUND(AVG(duration_min), 2) AS avg_duration_min,
                     ROUND(MEDIAN(duration_min), 2) AS median_duration_min,
@@ -564,5 +568,6 @@ def build_detail_summary_kpi_rows(
         ("最大ケース処理時間", dashboard_summary.get("max_case_duration_text", "0s")),
         ("最大ボトルネック遷移", top_transition_bottleneck_label),
     ]
+
 
 

@@ -1,4 +1,4 @@
-ANALYSIS_CONFIG = {
+﻿ANALYSIS_CONFIG = {
     "analysis_name": "頻度分析",
     "sheet_name": "頻度分析",
     "output_file_name": "頻度分析.xlsx",
@@ -48,7 +48,13 @@ def create_frequency_analysis(df, group_columns=None):
     )
 
     total_events = len(df)
+    total_cases = df["case_id"].nunique()
     result["event_ratio_pct"] = (result["event_count"] / total_events * 100).round(2)
+    result["case_ratio_pct"] = (
+        (result["case_count"] / total_cases * 100).round(2)
+        if total_cases > 0
+        else 0.0
+    )
 
     numeric_cols = [
         "total_duration_min",
