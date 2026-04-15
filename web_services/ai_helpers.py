@@ -147,6 +147,7 @@ def build_analysis_ai_prompt(ai_context):
 \u5206\u6790\u7d50\u679c\u3092\u8e0f\u307e\u3048\u3001\u6b21\u306b\u78ba\u8a8d\u3059\u3079\u304d\u30a2\u30af\u30b7\u30e7\u30f3\u3084\u8ffd\u52a0\u8abf\u67fb\u30921\u301c3\u70b9\u3001\u7b87\u6761\u66f8\u304d\u3067\u63d0\u6848\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u5b9f\u884c\u53ef\u80fd\u3067\u5177\u4f53\u7684\u306a\u5185\u5bb9\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002
 
 マークダウン記法（**、##、- のリスト記号など）は使わず、プレーンテキストで出力してください。
+ただしセクション見出しは必ず【】で囲んでください（例: 【全体傾向】【注目ポイント】【ボトルネック示唆】【推奨アクション】）。
 強調したい箇所は「」で囲んでください。箇条書きには「・」を使用してください。
 """
 
@@ -156,12 +157,18 @@ def extract_recommended_actions_from_text(text):
     if not normalized_text:
         return "", []
 
-    marker = "【推奨アクション】"
     lines = normalized_text.splitlines()
+    # 【推奨アクション】完全一致を優先、なければ「推奨アクション」を含む短い行にフォールバック
     marker_index = next(
-        (index for index, line in enumerate(lines) if line.strip() == marker),
+        (index for index, line in enumerate(lines) if line.strip() == "【推奨アクション】"),
         None,
     )
+    if marker_index is None:
+        marker_index = next(
+            (index for index, line in enumerate(lines)
+             if "推奨アクション" in line.strip() and len(line.strip()) <= 20),
+            None,
+        )
     if marker_index is None:
         return normalized_text, []
 
