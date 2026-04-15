@@ -81,3 +81,15 @@ COLUMN_DISPLAY_LABELS = {
     "activity_column": "アクティビティ",
     "timestamp_column": "タイムスタンプ",
 }
+
+FILTER_PARAM_NAMES = (
+    "date_from",
+    "date_to",
+    "filter_value_1",
+    "filter_value_2",
+    "filter_value_3",
+    "activity_mode",
+    "activity_values",
+    "start_activity_values",
+    "end_activity_values",
+)

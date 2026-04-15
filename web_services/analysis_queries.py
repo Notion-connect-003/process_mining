@@ -24,17 +24,7 @@ from 共通スクリプト.duckdb_service import (
     query_variant_summary,
 )
 
-FILTER_PARAM_NAMES = (
-    "date_from",
-    "date_to",
-    "filter_value_1",
-    "filter_value_2",
-    "filter_value_3",
-    "activity_mode",
-    "activity_values",
-    "start_activity_values",
-    "end_activity_values",
-)
+from web_config.app_settings import FILTER_PARAM_NAMES
 
 PROCESS_FLOW_PATTERN_CAP = 300
 MAX_PATTERN_FLOW_CACHE = 24

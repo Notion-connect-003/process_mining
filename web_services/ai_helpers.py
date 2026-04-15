@@ -16,24 +16,13 @@ from web_services.analysis_queries import (
 )
 from web_reports.detail_report import build_transition_display_label
 from web_reports.excel_common import REPORT_SHEET_NAMES, normalize_excel_cell_value
+from web_services.llm_helpers import request_ollama_insights_text
 
 from 共通スクリプト.analysis_service import get_available_analysis_definitions
 from 共通スクリプト.duckdb_service import (
     query_bottleneck_summary,
     query_period_text,
 )
-
-
-def _request_ollama_insights_text(prompt, model="qwen2.5:7b"):
-    timeout = httpx.Timeout(connect=5.0, read=60.0, write=10.0, pool=5.0)
-    with httpx.Client(timeout=timeout) as client:
-        response = client.post(
-            "http://localhost:11434/api/generate",
-            json={"model": model, "prompt": prompt, "stream": False},
-        )
-        response.raise_for_status()
-        payload = response.json()
-        return str(payload.get("response") or "").strip()
 
 
 def serialize_ai_prompt_rows(rows, max_items=5):
@@ -805,7 +794,7 @@ def build_ai_insights_summary(
             "cached": False,
         }
 
-    request_ai_text = generate_text or _request_ollama_insights_text
+    request_ai_text = generate_text or request_ollama_insights_text
 
     try:
         ai_text = request_ai_text(build_analysis_ai_prompt(ai_context))

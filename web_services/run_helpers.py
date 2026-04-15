@@ -17,17 +17,7 @@ from 共通スクリプト.analysis_service import (
 from 共通スクリプト.duckdb_service import persist_prepared_parquet
 
 
-FILTER_PARAM_NAMES = (
-    "date_from",
-    "date_to",
-    "filter_value_1",
-    "filter_value_2",
-    "filter_value_3",
-    "activity_mode",
-    "activity_values",
-    "start_activity_values",
-    "end_activity_values",
-)
+from web_config.app_settings import FILTER_PARAM_NAMES
 FILTER_COLUMN_NAMES = ("filter_column_1", "filter_column_2", "filter_column_3")
 FILTER_LABEL_NAMES = ("filter_label_1", "filter_label_2", "filter_label_3")
 

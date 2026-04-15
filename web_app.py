@@ -9,63 +9,23 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from web_config.app_settings import (
-    BASE_DIR as APP_BASE_DIR,
-    COLUMN_CANDIDATES as APP_COLUMN_CANDIDATES,
-    COLUMN_DISPLAY_LABELS as APP_COLUMN_DISPLAY_LABELS,
-    DEFAULT_HEADERS as APP_DEFAULT_HEADERS,
-    LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD as APP_LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD,
-    MAX_STORED_RUNS as APP_MAX_STORED_RUNS,
-    PREVIEW_ROW_COUNT as APP_PREVIEW_ROW_COUNT,
-    PROFILE_SAMPLE_FILE as APP_PROFILE_SAMPLE_FILE,
-    RUN_STORAGE_DIR as APP_RUN_STORAGE_DIR,
-    SAMPLE_FILE as APP_SAMPLE_FILE,
+    BASE_DIR,
+    COLUMN_CANDIDATES,
+    COLUMN_DISPLAY_LABELS,
+    DEFAULT_HEADERS,
+    LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD,
+    MAX_STORED_RUNS,
+    PREVIEW_ROW_COUNT,
+    PROFILE_SAMPLE_FILE,
+    RUN_STORAGE_DIR,
+    SAMPLE_FILE,
 )
 from web_reports.excel_common import (
-    ANALYSIS_PRECONDITIONS_TEXT,
-    APPLIED_FILTERS_NOTE_TEXT,
-    EXCEL_ALT_ROW_FILL,
-    EXCEL_ASSUMPTION_SECTION_FILL,
-    EXCEL_BODY_FONT,
-    EXCEL_BOLD_FONT,
-    EXCEL_GROUP_SECTION_FILL,
-    EXCEL_GROUP_SECTION_FONT,
-    EXCEL_HEADER_FILL,
-    EXCEL_LABEL_FILL,
-    EXCEL_MUTED_FONT,
-    EXCEL_MUTED_SECTION_FILL,
-    EXCEL_NOTE_FONT,
-    EXCEL_SECTION_FILL,
-    EXCEL_SUBTITLE_FILL,
-    EXCEL_TEXT_BLOCK_FILL,
-    EXCEL_THIN_BORDER,
-    EXCEL_TITLE_BORDER,
-    EXCEL_TITLE_FILL,
-    EXCEL_TITLE_FONT,
-    GROUPING_CONDITION_NOTE_TEXT,
-    REPORT_HEADER_LABELS,
-    REPORT_SHEET_NAMES,
-    TERMINOLOGY_ROWS,
-    append_bullet_rows,
-    append_custom_text_section_to_worksheet,
-    append_definition_table_to_worksheet,
-    append_key_value_rows,
-    append_table_to_worksheet,
-    append_text_block_to_worksheet,
-    autosize_worksheet_columns,
     build_analysis_excel_file_name,
-    estimate_wrapped_row_height,
-    initialize_excel_worksheet,
-    merge_excel_row,
-    normalize_excel_cell_value,
     resolve_analysis_display_name,
-    sanitize_workbook_sheet_name,
-    style_excel_cell,
 )
 
-from web_reports.detail_report import (
-    build_detail_export_workbook_bytes,
-    build_transition_display_label,
-)
+from web_reports.detail_report import build_detail_export_workbook_bytes
 from web_services.ai_helpers import (
     build_ai_insights_summary,
     build_empty_ai_summary,
@@ -73,8 +33,8 @@ from web_services.ai_helpers import (
     get_cached_ai_summary,
 )
 from web_services.llm_helpers import (
-    build_bottleneck_prompt as build_bottleneck_prompt_impl,
-    request_ollama_insights_text as request_ollama_insights_text_impl,
+    build_bottleneck_prompt,
+    request_ollama_insights_text,
 )
 from web_services.analyze_pipeline import (
     execute_analysis_pipeline,
@@ -160,10 +120,6 @@ from 共通スクリプト.analysis_service import (
     normalize_filter_column_settings,
 )
 from 共通スクリプト.duckdb_service import (
-    _build_scoped_relation_cte,
-    _format_stddev_column,
-    _get_parquet_column_names,
-    _quote_identifier,
     persist_prepared_parquet,
     query_activity_case_drilldown,
     query_analysis_records,
@@ -176,17 +132,6 @@ from 共通スクリプト.duckdb_service import (
     query_transition_case_drilldown,
 )
 
-
-BASE_DIR = APP_BASE_DIR
-SAMPLE_FILE = APP_SAMPLE_FILE
-PROFILE_SAMPLE_FILE = APP_PROFILE_SAMPLE_FILE
-RUN_STORAGE_DIR = APP_RUN_STORAGE_DIR
-MAX_STORED_RUNS = APP_MAX_STORED_RUNS
-PREVIEW_ROW_COUNT = APP_PREVIEW_ROW_COUNT
-LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD = APP_LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD
-DEFAULT_HEADERS = APP_DEFAULT_HEADERS
-COLUMN_CANDIDATES = APP_COLUMN_CANDIDATES
-COLUMN_DISPLAY_LABELS = APP_COLUMN_DISPLAY_LABELS
 
 app = FastAPI(title="Process Mining Workbench")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
@@ -204,10 +149,6 @@ def _template_response(request: Request, name: str, context: dict):
     if _STARLETTE_OLD_TEMPLATE_API:
         return templates.TemplateResponse(name, ctx)
     return templates.TemplateResponse(request, name, ctx)
-
-
-def request_ollama_insights_text(prompt, model="qwen2.5:7b"):
-    return request_ollama_insights_text_impl(prompt, model=model)
 
 
 register_detail_routes(
@@ -290,10 +231,6 @@ register_flow_routes(
     get_pattern_flow_snapshot_builder=lambda: create_pattern_flow_snapshot,
     get_large_dataset_flow_fast_path_threshold=lambda: LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD,
 )
-
-
-def build_bottleneck_prompt(data: dict) -> str:
-    return build_bottleneck_prompt_impl(data)
 
 
 register_ingest_routes(

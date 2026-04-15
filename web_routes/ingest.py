@@ -6,6 +6,8 @@ import duckdb
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from web_services.llm_helpers import stream_ollama_response
+
 
 def register_ingest_routes(
     app,
@@ -240,36 +242,10 @@ def register_ingest_routes(
         prompt = build_bottleneck_prompt(data)
 
         async def generate():
-            try:
-                timeout = httpx_module.Timeout(
-                    connect=10.0,
-                    read=60.0,
-                    write=10.0,
-                    pool=10.0,
-                )
-                async with httpx_module.AsyncClient(timeout=timeout) as client:
-                    async with client.stream(
-                        "POST",
-                        "http://localhost:11434/api/generate",
-                        json={"model": "qwen2.5:7b", "prompt": prompt, "stream": True},
-                    ) as response:
-                        response.raise_for_status()
-                        async for line in response.aiter_lines():
-                            if not line:
-                                continue
-                            chunk = json.loads(line)
-                            token = chunk.get("response", "")
-                            if token:
-                                yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
-                            if chunk.get("done"):
-                                yield f"data: {json.dumps({'done': True})}\n\n"
-                                return
-            except httpx_module.ConnectError:
-                yield (
-                    f"data: {json.dumps({'error': 'Ollamaが起動していません'}, ensure_ascii=False)}\n\n"
-                )
-            except Exception as exc:
-                msg = str(exc) or f"{type(exc).__name__}: 詳細不明"
-                yield f"data: {json.dumps({'error': msg}, ensure_ascii=False)}\n\n"
+            async for chunk in stream_ollama_response(
+                prompt,
+                httpx_module=httpx_module,
+            ):
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
 
         return StreamingResponse(generate(), media_type="text/event-stream")
