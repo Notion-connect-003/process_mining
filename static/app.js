@@ -1477,6 +1477,50 @@ function getDownloadFileName(response, fallbackFileName) {
     return fallbackFileName;
 }
 
+async function downloadBulkExcelArchive(runId, buttonElement) {
+    if (!runId) {
+        return;
+    }
+
+    const originalText = buttonElement?.innerHTML || "Excel一括出力";
+    if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.innerHTML = "生成中...";
+    }
+
+    try {
+        const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/excel-archive`);
+        if (!response.ok) {
+            let errorMessage = "Excel一括出力に失敗しました。";
+            try {
+                const payload = await response.json();
+                errorMessage = payload?.error || payload?.detail || errorMessage;
+            } catch {
+                // Ignore JSON parsing errors for binary/error responses.
+            }
+            throw new Error(errorMessage);
+        }
+
+        const blob = await response.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = downloadUrl;
+        anchor.download = getDownloadFileName(response, "全分析レポート.zip");
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(downloadUrl);
+        setStatus("Excel一括出力を開始しました。", "success");
+    } catch (error) {
+        setStatus(error.message || "Excel一括出力に失敗しました。", "error");
+    } finally {
+        if (buttonElement) {
+            buttonElement.disabled = false;
+            buttonElement.innerHTML = originalText;
+        }
+    }
+}
+
 function buildAppliedFilterSummary(appliedFilters = {}, columnSettings = {}) {
     const filterDefinitions = Array.isArray(columnSettings?.filters) ? columnSettings.filters : [];
     const labelMap = new Map(filterDefinitions.map((definition) => [definition.slot, definition.label]));
@@ -1558,6 +1602,7 @@ function renderFilterChipBar(appliedFilters = {}, columnSettings = {}) {
     }
 
     const chips = buildFilterChipItems(appliedFilters, columnSettings);
+    const latestRunId = isAnalyzing ? "" : String(loadLatestResult()?.run_id || "").trim();
     filterChipBar.innerHTML = `
         <div class="dashboard-filter-chipbar-items">
             ${chips.map((chip) => `
@@ -1571,12 +1616,16 @@ function renderFilterChipBar(appliedFilters = {}, columnSettings = {}) {
         </div>
         <div class="dashboard-filter-chipbar-actions">
             <span class="dashboard-filter-chipbar-note">${escapeHtml(buildAppliedFilterSummary(appliedFilters, columnSettings))}</span>
+            ${latestRunId ? '<button type="button" id="bulk-excel-btn" class="btn btn-primary dashboard-filter-export">Excel一括出力</button>' : ""}
         </div>
     `;
 
     filterChipBar.querySelector(".dashboard-filter-add")?.addEventListener("click", () => {
         setSetupSectionOpen(true);
         filterColumnRefs[1]?.columnSelect?.focus();
+    });
+    filterChipBar.querySelector("#bulk-excel-btn")?.addEventListener("click", (event) => {
+        void downloadBulkExcelArchive(latestRunId, event.currentTarget);
     });
 }
 
@@ -2027,6 +2076,7 @@ form.addEventListener("submit", async (event) => {
 
     isAnalyzing = true;
     syncSubmitState();
+    renderFilterChipBar(loadLatestResult()?.applied_filters, loadLatestResult()?.column_settings);
     setStatus("分析を実行しています...", "info");
     summaryPanel.className = "summary-panel hidden";
     renderInsightPanel(null, "hidden");
@@ -2056,6 +2106,7 @@ form.addEventListener("submit", async (event) => {
     } finally {
         isAnalyzing = false;
         syncSubmitState();
+        renderFilterChipBar(loadLatestResult()?.applied_filters, loadLatestResult()?.column_settings);
     }
 });
 

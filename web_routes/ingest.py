@@ -1,6 +1,8 @@
 import json
+from pathlib import Path
 from urllib.parse import quote
 
+import duckdb
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
@@ -161,6 +163,9 @@ def register_ingest_routes(
         )
 
         try:
+            raw_df = read_raw_log_dataframe(file_source)
+            if hasattr(file_source, "seek"):
+                file_source.seek(0)
             prepared_input = prepare_analysis_input_data(
                 file_source=file_source,
                 case_id_column=analyze_request["case_id_column"],
@@ -186,6 +191,28 @@ def register_ingest_routes(
                 run_storage_dir=run_storage_dir,
                 max_stored_runs=max_stored_runs,
             )
+            run_data = get_run_data(run_id)
+            run_storage_path = Path(str(run_data["prepared_parquet_path"])).resolve().parent
+
+            raw_csv_parquet_path = run_storage_path / "raw_upload.parquet"
+            with duckdb.connect() as connection:
+                connection.register("raw_upload_df", raw_df)
+                connection.execute(
+                    "COPY raw_upload_df TO ? (FORMAT PARQUET)",
+                    [str(raw_csv_parquet_path)],
+                )
+            run_data["raw_csv_parquet_path"] = str(raw_csv_parquet_path)
+
+            profile_payload = build_log_profile_payload(
+                raw_df=raw_df,
+                source_file_name=source_file_name,
+                case_id_column=str(prepared_input["case_id_column"] or "").strip(),
+                activity_column=str(prepared_input["activity_column"] or "").strip(),
+                timestamp_column=str(prepared_input["timestamp_column"] or "").strip(),
+                filter_column_settings=analyze_request["filter_column_settings"],
+                include_diagnostics=True,
+            )
+            run_data["log_diagnostic_profile_payload"] = profile_payload
         except ValueError as exc:
             return JSONResponse(status_code=400, content={"error": str(exc)})
         except Exception as exc:
@@ -203,7 +230,7 @@ def register_ingest_routes(
                 source_file_name=source_file_name,
                 selected_analysis_keys=analyze_request["selected_analysis_keys"],
                 result=result,
-                run_data=get_run_data(run_id),
+                run_data=run_data,
             )
         )
 

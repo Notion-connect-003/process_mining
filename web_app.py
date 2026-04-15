@@ -252,16 +252,17 @@ register_detail_routes(
     get_request_ollama_insights_text=lambda: request_ollama_insights_text,
     build_excel_bytes=build_excel_bytes,
     build_analysis_excel_file_name=build_analysis_excel_file_name,
-    build_detail_export_context=lambda run_data, analysis_key, filter_params, selected_transition_key="", variant_id=None: build_detail_export_context_impl(
+    build_detail_export_context=lambda run_data, analysis_key, filter_params, selected_transition_key="", variant_id=None, generate_text=None, build_excel_ai_summary_fn=None: build_detail_export_context_impl(
         run_data,
         analysis_key,
         filter_params,
         selected_transition_key=selected_transition_key,
         variant_id=variant_id,
-        generate_text=request_ollama_insights_text,
-        build_excel_ai_summary_fn=build_excel_ai_summary,
+        generate_text=generate_text if generate_text is not None else request_ollama_insights_text,
+        build_excel_ai_summary_fn=build_excel_ai_summary_fn if build_excel_ai_summary_fn is not None else build_excel_ai_summary,
     ),
     build_detail_export_workbook_bytes=build_detail_export_workbook_bytes,
+    build_log_diagnostic_workbook_bytes=build_log_diagnostic_workbook_bytes,
     resolve_analysis_display_name=resolve_analysis_display_name,
     get_filter_options_payload=lambda run_data: get_filter_options_payload_impl(
         run_data,

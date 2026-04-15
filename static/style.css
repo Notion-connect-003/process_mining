@@ -4067,6 +4067,7 @@ tbody tr:hover td {
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    gap: 12px;
 }
 
 .dashboard-filter-chipbar-note {
@@ -4077,6 +4078,20 @@ tbody tr:hover td {
 
 .dashboard-filter-add {
     cursor: pointer;
+}
+
+#bulk-excel-btn {
+    white-space: nowrap;
+    font-size: 14px;
+    padding: 10px 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#bulk-excel-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
 }
 
 .dashboard-filter-row {

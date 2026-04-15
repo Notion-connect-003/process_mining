@@ -271,7 +271,7 @@ class WebAppTestCase(unittest.TestCase):
         analyze_response = self.client.post(
             "/api/analyze",
             data={
-                "analysis_keys": ["frequency", "transition"],
+                "analysis_keys": ["frequency", "transition", "pattern"],
                 "export_excel": "on",
             },
         )
@@ -289,14 +289,36 @@ class WebAppTestCase(unittest.TestCase):
             excel_response.headers["content-type"],
         )
         self.assertIn("attachment;", excel_response.headers["content-disposition"])
+        self.assertIn("filename*=UTF-8''", excel_response.headers["content-disposition"])
+        self.assertIn("%E5%85%A8%E5%88%86%E6%9E%90%E3%83%AC%E3%83%9D%E3%83%BC%E3%83%88.zip", excel_response.headers["content-disposition"])
         self.assertTrue(excel_response.content.startswith(b"PK"))
 
         with ZipFile(BytesIO(excel_response.content)) as archive_file:
             archive_names = set(archive_file.namelist())
-            self.assertEqual(2, len(archive_names))
+            self.assertEqual(4, len(archive_names))
             self.assertTrue(all(name.endswith(".xlsx") for name in archive_names))
-            self.assertIn("sample_event_log_頻度分析.xlsx", archive_names)
-            self.assertIn("sample_event_log_前後処理分析.xlsx", archive_names)
+            self.assertIn("ログ診断.xlsx", archive_names)
+            self.assertIn("頻度分析.xlsx", archive_names)
+            self.assertIn("前後処理分析.xlsx", archive_names)
+            self.assertIn("処理順パターン分析.xlsx", archive_names)
+
+    def test_excel_archive_api_includes_error_log_when_some_analyses_are_missing(self):
+        run_id = self.analyze_uploaded_csv(
+            self.build_duckdb_validation_csv(),
+            analysis_keys=["frequency"],
+        )
+
+        excel_response = self.client.get(f"/api/runs/{run_id}/excel-archive")
+
+        self.assertEqual(200, excel_response.status_code)
+        with ZipFile(BytesIO(excel_response.content)) as archive_file:
+            archive_names = set(archive_file.namelist())
+            self.assertIn("ログ診断.xlsx", archive_names)
+            self.assertIn("頻度分析.xlsx", archive_names)
+            self.assertIn("エラーログ.txt", archive_names)
+            error_text = archive_file.read("エラーログ.txt").decode("utf-8")
+            self.assertIn("前後処理分析", error_text)
+            self.assertIn("処理順パターン分析", error_text)
 
 
     def test_report_excel_export_api_returns_workbook(self):
@@ -1489,6 +1511,24 @@ class WebAppTestCase(unittest.TestCase):
         self.assertTrue(
             str(run_data["prepared_parquet_path"]).endswith(f"{run_id}\\prepared.parquet")
         )
+
+    def test_analyze_api_persists_log_diagnostic_inputs_for_excel_archive(self):
+        run_id = self.analyze_uploaded_csv(
+            self.build_duckdb_validation_csv(),
+            analysis_keys=["frequency"],
+        )
+
+        run_data = web_app.get_run_data(run_id)
+        self.assertTrue(web_app.Path(run_data["raw_csv_parquet_path"]).exists())
+        self.assertTrue(
+            str(run_data["raw_csv_parquet_path"]).endswith(f"{run_id}\\raw_upload.parquet")
+        )
+        self.assertIn("log_diagnostic_profile_payload", run_data)
+        self.assertEqual(
+            run_data["source_file_name"],
+            run_data["log_diagnostic_profile_payload"]["source_file_name"],
+        )
+        self.assertIsNotNone(run_data["log_diagnostic_profile_payload"]["diagnostics"])
 
     def test_bottleneck_list_api_supports_uploaded_csv_with_duckdb_backing(self):
         run_id = self.analyze_uploaded_csv(

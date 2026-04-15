@@ -1,9 +1,11 @@
 ﻿from io import BytesIO
 from pathlib import Path
+from datetime import datetime
 from urllib.parse import quote
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pandas as pd
+import duckdb
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
@@ -36,6 +38,7 @@ def register_detail_routes(
     build_analysis_excel_file_name,
     build_detail_export_context,
     build_detail_export_workbook_bytes,
+    build_log_diagnostic_workbook_bytes,
     resolve_analysis_display_name,
     get_filter_options_payload,
 ):
@@ -260,7 +263,8 @@ def register_detail_routes(
     @app.get("/api/runs/{run_id}/excel-archive")
     def analysis_excel_archive_api(run_id: str):
         run_data = get_run_data(run_id)
-        analyses = run_data["result"]["analyses"]
+        filter_params = run_data.get("base_filter_params") or {}
+        errors = []
 
         archive_buffer = BytesIO()
         with ZipFile(
@@ -268,17 +272,59 @@ def register_detail_routes(
             mode="w",
             compression=ZIP_DEFLATED,
         ) as archive_file:
-            for current_analysis_key, analysis in analyses.items():
-                excel_df = pd.DataFrame(analysis["rows"])
-                output_file_name = build_analysis_excel_file_name(
-                    run_data["source_file_name"],
-                    current_analysis_key,
-                    analysis.get("analysis_name", ""),
-                )
-                excel_bytes = build_excel_bytes(excel_df, analysis["sheet_name"])
-                archive_file.writestr(output_file_name, excel_bytes)
+            try:
+                raw_csv_parquet_path = str(run_data.get("raw_csv_parquet_path") or "").strip()
+                profile_payload = run_data.get("log_diagnostic_profile_payload")
+                if raw_csv_parquet_path and profile_payload:
+                    with duckdb.connect() as connection:
+                        raw_df = connection.execute(
+                            "SELECT * FROM read_parquet(?)",
+                            [raw_csv_parquet_path],
+                        ).df()
+                    diagnostic_excel_bytes = build_log_diagnostic_workbook_bytes(
+                        profile_payload=profile_payload,
+                        raw_df=raw_df,
+                        sample_row_limit=3000,
+                    )
+                    archive_file.writestr("ログ診断.xlsx", diagnostic_excel_bytes)
+                else:
+                    errors.append("ログ診断: raw CSVデータが保存されていません（分析実行を再度行ってください）")
+            except Exception as exc:
+                errors.append(f"ログ診断: {exc}")
 
-        archive_file_name = f"{Path(run_data['source_file_name']).stem}_analysis_excels.zip"
+            for analysis_key, display_name in (
+                ("frequency", "頻度分析"),
+                ("transition", "前後処理分析"),
+                ("pattern", "処理順パターン分析"),
+            ):
+                if analysis_key not in (run_data.get("result", {}).get("analyses", {}) or {}):
+                    errors.append(f"{display_name}: 分析が実行されていません")
+                    continue
+                try:
+                    context = build_detail_export_context(
+                        run_data,
+                        analysis_key,
+                        filter_params,
+                        generate_text=lambda *_args, **_kwargs: "",
+                    )
+                    excel_bytes = build_detail_export_workbook_bytes(
+                        run_data=run_data,
+                        analysis_key=analysis_key,
+                        context=context,
+                        filter_params=filter_params,
+                        pattern_display_limit="10",
+                    )
+                    archive_file.writestr(f"{display_name}.xlsx", excel_bytes)
+                except Exception as exc:
+                    errors.append(f"{display_name}: {exc}")
+
+            if errors:
+                error_text = "以下のExcel生成でエラーが発生しました:\n" + "\n".join(errors)
+                archive_file.writestr("エラーログ.txt", error_text.encode("utf-8"))
+
+        archive_file_name = (
+            f"{Path(run_data['source_file_name']).stem}_{datetime.now().strftime('%Y%m%d')}_全分析レポート.zip"
+        )
 
         return Response(
             content=archive_buffer.getvalue(),
