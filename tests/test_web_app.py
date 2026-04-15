@@ -444,11 +444,9 @@ class WebAppTestCase(unittest.TestCase):
         explanation_row = self.find_row_by_value(ai_sheet, "解説本文")
         recommended_actions_row = self.find_row_by_value(ai_sheet, "推奨アクション")
         terminology_row = self.find_row_by_value(ai_sheet, "用語説明")
-        disclaimer_row = self.find_row_by_value(ai_sheet, "補足・免責事項")
         self.assertLess(analysis_premise_row, explanation_row)
         self.assertLess(explanation_row, recommended_actions_row)
         self.assertLess(recommended_actions_row, terminology_row)
-        self.assertLess(terminology_row, disclaimer_row)
         self.assertIn("処理時間は、同一ケース内で", str(ai_sheet.cell(row=analysis_premise_row + 1, column=1).value))
         self.assertIn("テスト用の分析コメント", str(ai_sheet.cell(row=explanation_row + 2, column=1).value))
         self.assertTrue(str(ai_sheet.cell(row=recommended_actions_row, column=1).fill.fgColor.rgb).endswith("E8EDF2"))
@@ -459,10 +457,13 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual("用語", ai_sheet.cell(row=terminology_row + 1, column=1).value)
         self.assertEqual("説明", ai_sheet.cell(row=terminology_row + 1, column=2).value)
         self.assertEqual("ケース", ai_sheet.cell(row=terminology_row + 2, column=1).value)
-        self.assertIn("ローカルLLMで生成した解説", str(ai_sheet.cell(row=disclaimer_row + 1, column=1).value))
         self.assertTrue(str(ai_sheet.cell(row=analysis_premise_row, column=1).fill.fgColor.rgb).endswith("E8EDF2"))
         self.assertTrue(str(ai_sheet.cell(row=terminology_row, column=1).fill.fgColor.rgb).endswith("F0F0F0"))
-        self.assertTrue(str(ai_sheet.cell(row=disclaimer_row, column=1).fill.fgColor.rgb).endswith("F0F0F0"))
+        ai_sheet_values = [
+            ai_sheet.cell(row=row_index, column=1).value
+            for row_index in range(1, ai_sheet.max_row + 1)
+        ]
+        self.assertNotIn("補足・免責事項", ai_sheet_values)
         self.assertTrue(
             str(ai_sheet.cell(row=terminology_row + 2, column=1).fill.fgColor.rgb).endswith("F7F7F7")
         )
@@ -677,9 +678,12 @@ class WebAppTestCase(unittest.TestCase):
         ai_sheet = workbook["分析コメント"]
         self.assertEqual("分析期間", ai_sheet["A5"].value)
         explanation_row = self.find_row_by_value(ai_sheet, "解説本文")
-        disclaimer_row = self.find_row_by_value(ai_sheet, "補足・免責事項")
         self.assertTrue(str(ai_sheet.cell(row=explanation_row + 1, column=1).value).strip())
-        self.assertTrue(str(ai_sheet.cell(row=disclaimer_row + 1, column=1).value).strip())
+        ai_sheet_values = [
+            ai_sheet.cell(row=row_index, column=1).value
+            for row_index in range(1, ai_sheet.max_row + 1)
+        ]
+        self.assertNotIn("補足・免責事項", ai_sheet_values)
         frequency_sheet = workbook["頻度分析"]
         frequency_headers = [
             frequency_sheet.cell(row=3, column=column_index).value

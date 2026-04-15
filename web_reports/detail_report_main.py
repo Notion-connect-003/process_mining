@@ -217,16 +217,6 @@ def _append_detail_export_ai_sheet(workbook, context, analysis_key=""):
         column_count=6,
         header_fill=EXCEL_MUTED_SECTION_FILL,
     )
-    next_row = _insert_spacer_row(ai_sheet, next_row)
-    append_custom_text_section_to_worksheet(
-        ai_sheet,
-        "補足・免責事項",
-        context["ai_summary"].get("note", ""),
-        start_row=next_row,
-        column_count=6,
-        header_fill=EXCEL_MUTED_SECTION_FILL,
-        body_fill=EXCEL_LABEL_FILL,
-    )
     ai_sheet._codex_min_column_widths = {
         "A": 18,
         "B": 50,
