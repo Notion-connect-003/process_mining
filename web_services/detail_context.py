@@ -124,7 +124,7 @@ def build_detail_export_context(
     *,
     selected_transition_key="",
     variant_id=None,
-    generate_text,
+    generate_text=None,
     build_excel_ai_summary_fn=build_excel_ai_summary,
 ):
     analysis_definitions = get_available_analysis_definitions()
