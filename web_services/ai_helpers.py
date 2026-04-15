@@ -50,16 +50,19 @@ def build_analysis_ai_prompt(ai_context):
             "focus": "\u4ef6\u6570\u304c\u96c6\u4e2d\u3057\u3066\u3044\u308b\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u3068\u3001\u5e73\u5747\u51e6\u7406\u6642\u9593\u304c\u9577\u3044\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u3092\u7279\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
             "priority": "\u983b\u5ea6\u306e\u504f\u308a\u3001\u51e6\u7406\u6642\u9593\u3001\u3070\u3089\u3064\u304d\u306e3\u70b9\u3092\u7d44\u307f\u5408\u308f\u305b\u3066\u3001\u6539\u5584\u4f59\u5730\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
             "actions": "\u5165\u53e3\u51e6\u7406\u306e\u898b\u76f4\u3057\u3001\u91cd\u8907\u4f5c\u696d\u306e\u524a\u6e1b\u3001\u6ede\u7559\u30b1\u30fc\u30b9\u306e\u78ba\u8a8d\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "constraint": "頻度分析では「バリアント」「パターン」という用語は使わず、アクティビティ単位の傾向に焦点を当ててください。",
         },
         "transition": {
             "focus": "\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u306b\u306a\u3063\u3066\u3044\u308b\u9077\u79fb\u3068\u3001\u305d\u306e\u524d\u5f8c\u306e\u51e6\u7406\u306e\u3064\u306a\u304c\u308a\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
             "priority": "\u9077\u79fb\u6642\u9593\u306e\u9577\u3055\u3001\u6539\u5584\u30a4\u30f3\u30d1\u30af\u30c8\u3001\u95a2\u9023\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u306e\u504f\u308a\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
             "actions": "\u524d\u5f8c\u5de5\u7a0b\u306e\u5f15\u304d\u7d99\u304e\u3001\u5f85\u3061\u6642\u9593\u3001\u627f\u8a8d\u7d4c\u8def\u306e\u898b\u76f4\u3057\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "constraint": "前後処理分析では「バリアント」「パターン」という用語は使わず、遷移（前後のアクティビティのつながり）に焦点を当ててください。",
         },
         "pattern": {
             "focus": "\u4e3b\u8981\u30d1\u30bf\u30fc\u30f3\u3068\u4f8b\u5916\u30d1\u30bf\u30fc\u30f3\u306e\u5dee\u3092\u660e\u78ba\u306b\u3057\u3001\u3069\u306e\u9806\u5e8f\u306b\u6539\u5584\u4f59\u5730\u304c\u3042\u308b\u304b\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
             "priority": "\u51fa\u73fe\u983b\u5ea6\u3001\u51e6\u7406\u6642\u9593\u3001\u5206\u5c90\u306e\u9055\u3044\u304b\u3089\u6539\u5584\u4f59\u5730\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
             "actions": "\u4f8b\u5916\u30eb\u30fc\u30c8\u306e\u539f\u56e0\u7279\u5b9a\u3084\u6a19\u6e96\u30eb\u30fc\u30c8\u3078\u306e\u96c6\u7d04\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
+            "constraint": "",
         },
     }
     focus_config = focus_map.get(
@@ -97,12 +100,14 @@ def build_analysis_ai_prompt(ai_context):
 
 """
 
+    constraint_line = f"- {focus_config['constraint']}" if focus_config.get('constraint') else ""
     return f"""\u3042\u306a\u305f\u306f\u30d7\u30ed\u30bb\u30b9\u30de\u30a4\u30cb\u30f3\u30b0\u306e\u5206\u6790\u7d50\u679c\u3092\u8981\u7d04\u3059\u308b\u30a2\u30ca\u30ea\u30b9\u30c8\u3067\u3059\u3002\u4ee5\u4e0b\u306e\u5206\u6790\u7d50\u679c\u306b\u57fa\u3065\u304d\u3001\u7c21\u6f54\u3067\u5b9f\u52d9\u306b\u4f7f\u3048\u308b\u89e3\u8aac\u3092\u65e5\u672c\u8a9e\u3067\u4f5c\u6210\u3057\u3066\u304f\u3060\u3055\u3044\u3002
 
 ## \u3053\u306e\u5206\u6790\u3067\u91cd\u8996\u3059\u308b\u8996\u70b9
 - {focus_config['focus']}
 - {focus_config['priority']}
 - {focus_config['actions']}
+{constraint_line}
 
 ## \u57fa\u672c\u60c5\u5831
 - \u5206\u6790\u540d: {analysis_name}
@@ -146,9 +151,10 @@ def build_analysis_ai_prompt(ai_context):
 {group_instruction}【\u63a8\u5968\u30a2\u30af\u30b7\u30e7\u30f3】
 \u5206\u6790\u7d50\u679c\u3092\u8e0f\u307e\u3048\u3001\u6b21\u306b\u78ba\u8a8d\u3059\u3079\u304d\u30a2\u30af\u30b7\u30e7\u30f3\u3084\u8ffd\u52a0\u8abf\u67fb\u30921\u301c3\u70b9\u3001\u7b87\u6761\u66f8\u304d\u3067\u63d0\u6848\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u5b9f\u884c\u53ef\u80fd\u3067\u5177\u4f53\u7684\u306a\u5185\u5bb9\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002
 
-マークダウン記法（**、##、- のリスト記号など）は使わず、プレーンテキストで出力してください。
+マークダウン記法（**、##、- 、▸ のリスト記号など）は使わず、プレーンテキストで出力してください。
 ただしセクション見出しは必ず【】で囲んでください（例: 【全体傾向】【注目ポイント】【ボトルネック示唆】【推奨アクション】）。
 強調したい箇所は「」で囲んでください。箇条書きには「・」を使用してください。
+処理時間を日数で表す場合は「X日Y時間」形式ではなく「X.X日」形式で記載してください。
 """
 
 def extract_recommended_actions_from_text(text):
@@ -827,7 +833,7 @@ def build_ai_insights_summary(
                     for item in ai_context["insights_summary"].get("items", [])
                 ],
                 "recommended_actions": llm_actions,
-                "note": "現在の分析条件に対応する分析コメントを保存しました。画面を切り替えても同じ条件なら再表示されます。",
+                "note": "",
             }
             if use_cache:
                 cache[cache_key] = payload
@@ -837,13 +843,13 @@ def build_ai_insights_summary(
                 "cached": False,
             }
     except httpx.ConnectError:
-        error_message = "分析コメントを生成できなかったため、既存集計からの要約を掲載しています。"
+        error_message = "既存集計からの要約を掲載しています。"
     except Exception as exc:
         error_message = (
-            f"分析コメントの生成に失敗したため、ルールベース要約を掲載しています。({exc})"
+            "既存集計からの要約を掲載しています。"
         )
     else:
-        error_message = "分析コメントを生成できなかったため、ルールベース要約を掲載しています。"
+        error_message = "既存集計からの要約を掲載しています。"
 
     fallback_actions = build_ai_recommended_actions(ai_context)
     payload = {
