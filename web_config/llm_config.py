@@ -16,14 +16,14 @@ OLLAMA_THINK = False                   # thinking モード (True/False)
 # ---------------------------------------------------------------------------
 OLLAMA_TIMEOUT_SYNC = httpx.Timeout(
     connect=5.0,
-    read=60.0,
+    read=180.0,
     write=10.0,
     pool=5.0,
 )
 
 OLLAMA_TIMEOUT_STREAM = httpx.Timeout(
     connect=10.0,
-    read=60.0,
+    read=180.0,
     write=10.0,
     pool=10.0,
 )
