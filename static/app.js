@@ -1,4 +1,4 @@
-const PREVIEW_ROW_COUNT = 10;
+﻿const PREVIEW_ROW_COUNT = 10;
 const STORAGE_KEY = "processMiningLastResult";
 const TOP_PAGE_STATE_KEY = "processMiningTopPageState";
 const DASHBOARD_SUPPLEMENT_KEY = "processMiningDashboardSupplement";
@@ -6,9 +6,9 @@ const FLOW_SELECTION_STORAGE_KEY = "processMiningFlowSelection";
 const TRANSITION_DRILLDOWN_STORAGE_KEY = "processMiningTransitionDrilldown";
 const FILTER_SLOT_KEYS = ["filter_value_1", "filter_value_2", "filter_value_3"];
 const DEFAULT_FILTER_LABELS = {
-    filter_value_1: "グループ/カテゴリー フィルター①",
-    filter_value_2: "グループ/カテゴリー フィルター②",
-    filter_value_3: "グループ/カテゴリー フィルター③",
+    filter_value_1: "グループ/カテゴリ フィルター①",
+    filter_value_2: "グループ/カテゴリ フィルター②",
+    filter_value_3: "グループ/カテゴリ フィルター③",
 };
 
 const form = document.getElementById("analyze-form");
@@ -41,6 +41,8 @@ const activityColumnSelect = document.getElementById("activity-column-select");
 const timestampColumnSelect = document.getElementById("timestamp-column-select");
 const analysisDateFromInput = document.getElementById("analysis-date-from");
 const analysisDateToInput = document.getElementById("analysis-date-to");
+const startActivityValuesSelect = document.getElementById("start-activity-values-select");
+const endActivityValuesSelect = document.getElementById("end-activity-values-select");
 
 const filterColumnRefs = [
     {
@@ -223,7 +225,7 @@ function updateSetupSummary(resultData = loadLatestResult(), supplement = curren
             currentProfilePayload?.source_file_name
             || resultData?.source_file_name
             || defaultSourceFileName
-            || "",
+            || ""
         ).trim();
         setupSourceTag.textContent = sourceFileName
             ? `ファイル: ${sourceFileName}`
@@ -265,20 +267,19 @@ function updateSetupSummary(resultData = loadLatestResult(), supplement = curren
 
     setupVolumeTag.textContent = "件数: ログ診断未実行";
 }
-
 function buildPreviewMessage(analysis, previewRows) {
     const totalRowCount = Number(analysis?.row_count ?? analysis?.rows?.length ?? 0);
     return totalRowCount > previewRows.length
-        ? `Top ${previewRows.length} を表示 / 全 ${formatNumber(totalRowCount)} 件`
+        ? `Top ${previewRows.length} 件を表示 / 全 ${formatNumber(totalRowCount)} 件`
         : `全 ${formatNumber(totalRowCount)} 件を表示`;
 }
 
 function getDashboardPreviewHeaders(analysisKey) {
     switch (analysisKey) {
     case "frequency":
-        return ["アクティビティ", "イベント件数", "ケース数", "平均処理時間(分)"];
+        return ["アクティビティ", "イベント件数", "ケース数", "平均所要時間(分)"];
     case "transition":
-        return ["遷移名", "ケース数", "平均所要時間(分)", "中央値所要時間(分)", "割合(%)"];
+        return ["遷移", "ケース数", "平均所要時間(分)", "中央値所要時間(分)", "比率(%)"];
     case "pattern":
         return ["パターン", "ケース数", "比率(%)", "平均ケース処理時間(分)"];
     default:
@@ -291,16 +292,16 @@ function buildDashboardPreviewRows(analysisKey, rows = []) {
 
     return rows.slice(0, 5).map((row, rowIndex) => {
         if (analysisKey === "transition") {
-            const transitionName = row["遷移名"]
-                || [row["前処理アクティビティ名"], row["後処理アクティビティ名"]]
+            const transitionName = row["遷移"]
+                || [row["遷移元アクティビティ"], row["遷移先アクティビティ"]]
                     .filter(Boolean)
                     .join(" → ");
             return {
-                "遷移名": transitionName,
+                "遷移": transitionName || "-",
                 "ケース数": row["ケース数"] ?? row["遷移件数"] ?? "-",
-                "平均所要時間(分)": row["平均所要時間(分)"] ?? row["平均時間(分)"] ?? "-",
-                "中央値所要時間(分)": row["中央値所要時間(分)"] ?? row["中央値時間(分)"] ?? "-",
-                "割合(%)": row["割合(%)"] ?? row["遷移比率(%)"] ?? "-",
+                "平均所要時間(分)": row["平均所要時間(分)"] ?? "-",
+                "中央値所要時間(分)": row["中央値所要時間(分)"] ?? "-",
+                "比率(%)": row["比率(%)"] ?? row["遷移比率(%)"] ?? "-",
                 __rowIndex: rowIndex,
             };
         }
@@ -309,21 +310,21 @@ function buildDashboardPreviewRows(analysisKey, rows = []) {
             const patternText = String(
                 row["パターン"]
                 || row["処理順パターン"]
-                || row["パターン / バリアント"]
+                || row.pattern
                 || ""
             ).trim();
             const patternSteps = patternText
-                .split(/\s*(?:→|->|⇒)\s*/u)
+                .split(/\s*(?:→|->)\s*/u)
                 .map((step) => step.trim())
                 .filter(Boolean);
             const compactPattern = patternSteps.length > 3
-                ? `${patternSteps.slice(0, 3).join(" → ")} → ...（全${patternSteps.length}ステップ）`
+                ? `${patternSteps.slice(0, 3).join(" → ")} → ... (${patternSteps.length}ステップ)`
                 : patternText;
             return {
                 "パターン": compactPattern || "-",
                 "ケース数": row["ケース数"] ?? "-",
                 "比率(%)": row["比率(%)"] ?? row["ケース比率(%)"] ?? "-",
-                "平均ケース処理時間(分)": row["平均ケース処理時間(分)"] ?? row["平均処理時間(分)"] ?? "-",
+                "平均ケース処理時間(分)": row["平均ケース処理時間(分)"] ?? row["平均所要時間(分)"] ?? "-",
                 __rowIndex: rowIndex,
             };
         }
@@ -351,18 +352,18 @@ function renderInsightPanel(supplement, state = "ready") {
     const insightTexts = Array.isArray(supplement?.insights?.items)
         ? supplement.insights.items.map((item) => String(item?.text || "").trim()).filter(Boolean).slice(0, 5)
         : [];
-    let chipLabel = "AI 判定";
+    let chipLabel = "AI 要約";
     let bodyText = "";
 
     if (state === "loading") {
         chipLabel = "読込中";
-        bodyText = "分析結果をもとに、ダッシュボード向けの要点を整理しています。";
+        bodyText = "ダッシュボードの補足情報を取得しています。";
     } else if (state === "error") {
         chipLabel = "取得失敗";
-        bodyText = "ダッシュボード用の要約取得に失敗しました。分析結果の表プレビューはそのまま確認できます。";
+        bodyText = "ダッシュボード補足の取得に失敗しました。";
     } else if (!insightTexts.length) {
         chipLabel = "準備中";
-        bodyText = "分析を実行すると、この画面向けのインサイトを表示します。";
+        bodyText = "分析を実行すると、この画面向けの要点を表示します。";
     }
 
     insightPanel.className = "dashboard-insight";
@@ -376,22 +377,18 @@ function renderInsightPanel(supplement, state = "ready") {
             state === "ready" && insightTexts.length
                 ? `
                     <ul class="dashboard-insight-list">
-                        ${insightTexts.map((text, index) => {
-                            const icons = ["📊", "📈", "⚠️", "🔍", "✅"];
-                            return `
-                                <li class="dashboard-insight-item">
-                                    <span class="dashboard-insight-item-icon">${icons[index] || "•"}</span>
-                                    <span>${escapeHtml(text)}</span>
-                                </li>
-                            `;
-                        }).join("")}
+                        ${insightTexts.map((text) => `
+                            <li class="dashboard-insight-item">
+                                <span class="dashboard-insight-item-icon">•</span>
+                                <span>${escapeHtml(text)}</span>
+                            </li>
+                        `).join("")}
                     </ul>
                 `
                 : `<p class="dashboard-insight-text">${escapeHtml(bodyText)}</p>`
         }
     `;
 }
-
 function buildDefaultProfilePayload() {
     return {
         headers: [],
@@ -539,7 +536,7 @@ function buildGroupedTable(rows, groupColumns = [], options = {}) {
     const allHeaders = [...validGroupCols, ...nonGroupHeaders];
     const headHtml = allHeaders.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
 
-    // rowspan計算: 各行・各グループ列について「同じ上位グループ値が続く連続数」を求める
+    // rowspan險育ｮ・ 蜷・｡後・蜷・げ繝ｫ繝ｼ繝怜・縺ｫ縺､縺・※縲悟酔縺倅ｸ贋ｽ阪げ繝ｫ繝ｼ繝怜､縺檎ｶ壹￥騾｣邯壽焚縲阪ｒ豎ゅａ繧・
     function calcRowspan(rowIndex, colIndex) {
         const row = rows[rowIndex];
         let span = 1;
@@ -605,7 +602,7 @@ function buildGroupedTable(rows, groupColumns = [], options = {}) {
 
 function splitPatternSteps(patternText) {
     return String(patternText || "")
-        .split(/\s*(?:→|->|⇒)\s*/u)
+        .split(/\s*(?:→|->)\s*/u)
         .map((step) => step.trim())
         .filter(Boolean);
 }
@@ -634,7 +631,7 @@ function buildPatternReviewFlag(repeatRatePct) {
 
 function buildPatternSimpleComment(repeatCount, repeatRatePct) {
     if (Number(repeatRatePct || 0) >= 20) {
-        return `繰り返し率が ${Number(repeatRatePct || 0).toFixed(2)}% と高く、再確認や差戻しが発生している可能性があります。`;
+        return `繰り返し率 ${Number(repeatRatePct || 0).toFixed(2)}% で、手戻りが多い可能性があります。`;
     }
     if (Number(repeatCount || 0) > 0) {
         return `同一アクティビティの繰り返しが ${Number(repeatCount || 0)} 回あります。`;
@@ -651,7 +648,6 @@ function normalizePatternAnalysisRow(row) {
         row["処理順パターン"]
         || row["パターン"]
         || row.pattern
-        || row["代表ルート"]
         || ""
     );
     const repeatFlag = hasRepeatedPatternStep(patternText) ? "○" : "";
@@ -659,69 +655,15 @@ function normalizePatternAnalysisRow(row) {
     const repeatRatePct = calculateRepeatRatePct(patternText);
     const reviewFlag = buildPatternReviewFlag(repeatRatePct);
     const simpleComment = buildPatternSimpleComment(repeatCount, repeatRatePct);
-    const normalizedEntries = [];
-    let hasRepeatColumn = false;
-    let hasRepeatCountColumn = false;
-    let hasRepeatRateColumn = false;
-    let hasReviewFlagColumn = false;
-    let hasCommentColumn = false;
 
-    Object.entries(row).forEach(([key, value]) => {
-        if (key === "業務ラベル") {
-            normalizedEntries.push(["繰り返し", repeatFlag]);
-            hasRepeatColumn = true;
-            return;
-        }
-        if (key === "繰り返し") {
-            normalizedEntries.push(["繰り返し", repeatFlag]);
-            hasRepeatColumn = true;
-            return;
-        }
-        if (key === "繰り返し回数") {
-            normalizedEntries.push(["繰り返し回数", repeatCount]);
-            hasRepeatCountColumn = true;
-            return;
-        }
-        if (key === "繰り返し率(%)") {
-            normalizedEntries.push(["繰り返し率(%)", repeatRatePct]);
-            hasRepeatRateColumn = true;
-            return;
-        }
-        if (key === "確認区分") {
-            normalizedEntries.push(["確認区分", reviewFlag]);
-            hasReviewFlagColumn = true;
-            return;
-        }
-        if (key === "簡易コメント") {
-            normalizedEntries.push(["簡易コメント", simpleComment]);
-            hasCommentColumn = true;
-            return;
-        }
-        if (key === "評価") {
-            return;
-        }
-
-        normalizedEntries.push([key, value]);
-    });
-
-    if (!hasRepeatColumn) {
-        const repeatEntry = ["繰り返し", repeatFlag];
-        normalizedEntries.unshift(repeatEntry);
-    }
-    if (!hasRepeatCountColumn) {
-        normalizedEntries.splice(Math.min(1, normalizedEntries.length), 0, ["繰り返し回数", repeatCount]);
-    }
-    if (!hasRepeatRateColumn) {
-        normalizedEntries.splice(Math.min(2, normalizedEntries.length), 0, ["繰り返し率(%)", repeatRatePct]);
-    }
-    if (!hasReviewFlagColumn) {
-        normalizedEntries.splice(Math.min(3, normalizedEntries.length), 0, ["確認区分", reviewFlag]);
-    }
-    if (!hasCommentColumn) {
-        normalizedEntries.splice(Math.min(4, normalizedEntries.length), 0, ["簡易コメント", simpleComment]);
-    }
-
-    return Object.fromEntries(normalizedEntries);
+    return {
+        ...row,
+        "繰り返し": row["繰り返し"] ?? repeatFlag,
+        "繰り返し回数": row["繰り返し回数"] ?? repeatCount,
+        "繰り返し率(%)": row["繰り返し率(%)"] ?? repeatRatePct,
+        "確認区分": row["確認区分"] ?? reviewFlag,
+        "簡易コメント": row["簡易コメント"] ?? simpleComment,
+    };
 }
 
 function normalizeLatestResult(data) {
@@ -812,11 +754,14 @@ function isUploadedSourceName(sourceFileName) {
 }
 
 function buildTopPageState() {
+    const activityEndpointFilterState = getCurrentActivityEndpointFilterState();
     return {
         source_file_name: currentProfilePayload?.source_file_name || "",
         profilePayload: currentProfilePayload,
         mapping_state: getCurrentMappingState(),
         filter_value_state: getCurrentFilterValueState(),
+        start_activity_values: activityEndpointFilterState.start_activity_values,
+        end_activity_values: activityEndpointFilterState.end_activity_values,
         date_from: String(analysisDateFromInput?.value || "").trim(),
         date_to: String(analysisDateToInput?.value || "").trim(),
         diagnostics_sample_limit: String(
@@ -877,6 +822,17 @@ function restoreTopPageState(state) {
             filterRef.valueSelect.value = selectedValue;
         }
     });
+
+    replaceMultiSelectOptions(
+        startActivityValuesSelect,
+        Array.from(startActivityValuesSelect?.options || []).map((option) => option.value),
+        Array.isArray(state.start_activity_values) ? state.start_activity_values : [],
+    );
+    replaceMultiSelectOptions(
+        endActivityValuesSelect,
+        Array.from(endActivityValuesSelect?.options || []).map((option) => option.value),
+        Array.isArray(state.end_activity_values) ? state.end_activity_values : [],
+    );
 
     const restoredSourceFileName = String(
         state.profilePayload?.source_file_name || state.source_file_name || "",
@@ -951,7 +907,7 @@ function getPreferredSelection(options, ...candidates) {
     return "";
 }
 
-function replaceSelectOptions(selectElement, options, selectedValue, placeholder = "選択してください") {
+function replaceSelectOptions(selectElement, options, selectedValue, placeholder = "驕ｸ謚槭＠縺ｦ縺上□縺輔＞") {
     if (!selectElement) {
         return;
     }
@@ -962,6 +918,47 @@ function replaceSelectOptions(selectElement, options, selectedValue, placeholder
         selectElement.append(new Option(optionValue, optionValue, false, optionValue === selectedValue));
     });
     selectElement.value = selectedValue || "";
+}
+
+function replaceMultiSelectOptions(selectElement, options, selectedValues = []) {
+    if (!selectElement) {
+        return;
+    }
+
+    const normalizedSelectedValues = [...new Set(
+        (Array.isArray(selectedValues) ? selectedValues : [])
+            .map((value) => String(value || "").trim())
+            .filter(Boolean)
+    )];
+    const normalizedOptions = [...new Set(
+        [
+            ...(Array.isArray(options) ? options : []),
+            ...normalizedSelectedValues,
+        ]
+            .map((value) => String(value || "").trim())
+            .filter(Boolean)
+    )].sort((leftValue, rightValue) => leftValue.localeCompare(rightValue, "ja"));
+
+    selectElement.innerHTML = normalizedOptions.map((value) => `
+        <option value="${escapeHtml(value)}">${escapeHtml(value)}</option>
+    `).join("");
+
+    Array.from(selectElement.options).forEach((optionElement) => {
+        optionElement.selected = normalizedSelectedValues.includes(optionElement.value);
+    });
+}
+
+function readMultiSelectValues(selectElement) {
+    return Array.from(selectElement?.selectedOptions || [])
+        .map((optionElement) => String(optionElement.value || "").trim())
+        .filter(Boolean);
+}
+
+function getCurrentActivityEndpointFilterState() {
+    return {
+        start_activity_values: readMultiSelectValues(startActivityValuesSelect),
+        end_activity_values: readMultiSelectValues(endActivityValuesSelect),
+    };
 }
 
 function renderColumnSelectors(profilePayload) {
@@ -1015,6 +1012,32 @@ function renderColumnSelectors(profilePayload) {
     });
 }
 
+function renderActivityEndpointSelectors(profilePayload) {
+    const currentFilterState = getCurrentActivityEndpointFilterState();
+    const allActivityNames = Array.isArray(profilePayload?.filter_options?.all_activity_names)
+        ? profilePayload.filter_options.all_activity_names
+        : [];
+
+    replaceMultiSelectOptions(
+        startActivityValuesSelect,
+        allActivityNames,
+        currentFilterState.start_activity_values,
+    );
+    replaceMultiSelectOptions(
+        endActivityValuesSelect,
+        allActivityNames,
+        currentFilterState.end_activity_values,
+    );
+
+    const isDisabled = allActivityNames.length === 0;
+    if (startActivityValuesSelect) {
+        startActivityValuesSelect.disabled = isDisabled;
+    }
+    if (endActivityValuesSelect) {
+        endActivityValuesSelect.disabled = isDisabled;
+    }
+}
+
 function renderFilterValueSelectors(profilePayload) {
     const currentFilterValues = getCurrentFilterValueState();
     const filterDefinitions = getFilterValueDefinitions(profilePayload);
@@ -1034,7 +1057,7 @@ function renderFilterValueSelectors(profilePayload) {
             filterRef.valueLabel.textContent = "値";
         }
 
-        const valuePlaceholder = definition.column_name ? "全て（グループ集計）" : "全て";
+        const valuePlaceholder = definition.column_name ? "すべて（グループ設定）" : "すべて";
         replaceSelectOptions(filterRef.valueSelect, options, selectedValue, valuePlaceholder);
         filterRef.valueSelect.disabled = !definition.column_name;
     });
@@ -1044,8 +1067,8 @@ function renderFilterValueSelectors(profilePayload) {
     }
 
     filterSelectionNote.textContent = selectedFilters.length
-        ? `現在の分析対象条件: ${selectedFilters.join(" / ")}`
-        : "分析対象条件ごとに対象列を設定すると、絞り込み値を選択できます。";
+        ? `現在のフィルター候補: ${selectedFilters.join(" / ")}`
+        : "分析対象にしたい列を選ぶと、絞り込み候補を選択できます。";
 }
 
 function buildMissingCountText(diagnostics) {
@@ -1060,9 +1083,9 @@ function buildMissingCountText(diagnostics) {
 
 function buildLogPeriodText(diagnostics) {
     if (!diagnostics?.time_range?.min || !diagnostics?.time_range?.max) {
-        return "ケースID / アクティビティ / タイムスタンプを選択すると表示します。";
+        return "ケースID / アクティビティ / タイムスタンプ列を選択すると表示します。";
     }
-    return `${diagnostics.time_range.min} 〜 ${diagnostics.time_range.max}`;
+    return `${diagnostics.time_range.min} ～ ${diagnostics.time_range.max}`;
 }
 
 function buildDuplicateRateText(diagnostics) {
@@ -1077,7 +1100,7 @@ function renderDiagnostics(profilePayload) {
 
     const diagnostics = profilePayload?.diagnostics;
     if (!diagnostics) {
-        diagnosticsPanel.innerHTML = '<p class="empty-state">ログ診断を実行すると、件数・期間・欠損件数・列サマリーを表示します。</p>';
+        diagnosticsPanel.innerHTML = '<p class="empty-state">ログ診断を実行すると、件数・期間・欠損数・サンプル値を表示します。</p>';
         return;
     }
 
@@ -1093,45 +1116,16 @@ function renderDiagnostics(profilePayload) {
 
     diagnosticsPanel.innerHTML = `
         <div class="diagnostics-summary-grid">
-            <article class="diagnostic-card">
-                <span class="summary-label">ログレコード数</span>
-                <strong>${escapeHtml(diagnostics.record_count ?? "-")}</strong>
-            </article>
-            <article class="diagnostic-card">
-                <span class="summary-label">総ケース数</span>
-                <strong>${escapeHtml(diagnostics.case_count ?? "-")}</strong>
-            </article>
-            <article class="diagnostic-card">
-                <span class="summary-label">アクティビティ種類数</span>
-                <strong>${escapeHtml(diagnostics.activity_type_count ?? "-")}</strong>
-            </article>
-            <article class="diagnostic-card">
-                <span class="summary-label">ログ期間</span>
-                <strong>${escapeHtml(buildLogPeriodText(diagnostics))}</strong>
-            </article>
-            <article class="diagnostic-card">
-                <span class="summary-label">欠損件数</span>
-                <strong>${escapeHtml(buildMissingCountText(diagnostics))}</strong>
-            </article>
-            <article class="diagnostic-card">
-                <span class="summary-label">重複行数</span>
-                <strong>${escapeHtml(diagnostics.duplicate_row_count ?? 0)}</strong>
-            </article>
-            <article class="diagnostic-card">
-                <span class="summary-label">重複あり/なし</span>
-                <strong>${escapeHtml(diagnostics.duplicate_status || "なし")}</strong>
-            </article>
-            <article class="diagnostic-card">
-                <span class="summary-label">重複除外後レコード数</span>
-                <strong>${escapeHtml(diagnostics.deduplicated_record_count ?? "-")}</strong>
-            </article>
-            <article class="diagnostic-card">
-                <span class="summary-label">重複率</span>
-                <strong>${escapeHtml(buildDuplicateRateText(diagnostics))}</strong>
-            </article>
+            <article class="diagnostic-card"><span class="summary-label">ログレコード数</span><strong>${escapeHtml(diagnostics.record_count ?? "-")}</strong></article>
+            <article class="diagnostic-card"><span class="summary-label">ケース数</span><strong>${escapeHtml(diagnostics.case_count ?? "-")}</strong></article>
+            <article class="diagnostic-card"><span class="summary-label">アクティビティ種類数</span><strong>${escapeHtml(diagnostics.activity_type_count ?? "-")}</strong></article>
+            <article class="diagnostic-card"><span class="summary-label">ログ期間</span><strong>${escapeHtml(buildLogPeriodText(diagnostics))}</strong></article>
+            <article class="diagnostic-card"><span class="summary-label">欠損数</span><strong>${escapeHtml(buildMissingCountText(diagnostics))}</strong></article>
+            <article class="diagnostic-card"><span class="summary-label">重複行数</span><strong>${escapeHtml(diagnostics.duplicate_row_count ?? 0)}</strong></article>
+            <article class="diagnostic-card"><span class="summary-label">重複あり/なし</span><strong>${escapeHtml(diagnostics.duplicate_status || "なし")}</strong></article>
+            <article class="diagnostic-card"><span class="summary-label">重複除外後レコード数</span><strong>${escapeHtml(diagnostics.deduplicated_record_count ?? "-")}</strong></article>
+            <article class="diagnostic-card"><span class="summary-label">重複率</span><strong>${escapeHtml(buildDuplicateRateText(diagnostics))}</strong></article>
         </div>
-        <p class="panel-note">ログレコード数 = イベント行数です。同じタイムスタンプが複数行に現れることは正常です。</p>
-        <p class="panel-note">重複行は全列完全一致で判定しています。</p>
         <p class="panel-note">ヘッダー一覧: ${escapeHtml((diagnostics.headers || []).join(", "))}</p>
         <div class="table-wrap diagnostics-table-wrap">
             <table class="data-table">
@@ -1155,7 +1149,7 @@ function updateColumnSourceNote(sourceFileName) {
     }
 
     if (requiresFileReselection && !csvFileInput?.files?.[0]) {
-        columnSourceNote.innerHTML = `前回は <code>${escapeHtml(sourceFileName || "アップロードファイル")}</code> の設定を復元しています。再分析やログ診断を実行するには、CSV ファイルを再選択してください。`;
+        columnSourceNote.innerHTML = `前回は <code>${escapeHtml(sourceFileName || "CSV ファイル")}</code> を使っていました。再実行するには CSV を選び直してください。`;
         return;
     }
 
@@ -1164,12 +1158,13 @@ function updateColumnSourceNote(sourceFileName) {
         return;
     }
 
-    columnSourceNote.innerHTML = `現在は <code>${escapeHtml(sourceFileName)}</code> の内容を基準に表示しています。`;
+    columnSourceNote.innerHTML = `現在は <code>${escapeHtml(sourceFileName)}</code> の列候補を表示しています。`;
 }
 
 function renderProfilePayload(profilePayload) {
     currentProfilePayload = profilePayload || currentProfilePayload;
     renderColumnSelectors(currentProfilePayload);
+    renderActivityEndpointSelectors(currentProfilePayload);
     renderFilterValueSelectors(currentProfilePayload);
     renderDiagnostics(currentProfilePayload);
     updateColumnSourceNote(currentProfilePayload?.source_file_name || "");
@@ -1201,6 +1196,19 @@ function getDiagnosticsSampleLimit() {
 function appendDiagnosticsSettings(formData) {
     appendMappingSettings(formData);
     formData.set("sample_row_limit", String(getDiagnosticsSampleLimit()));
+}
+
+function appendActivityEndpointFilterSettings(formData) {
+    const activityEndpointFilterState = getCurrentActivityEndpointFilterState();
+    ["start_activity_values", "end_activity_values"].forEach((fieldName) => {
+        formData.delete(fieldName);
+        const selectedValues = Array.isArray(activityEndpointFilterState[fieldName])
+            ? activityEndpointFilterState[fieldName]
+            : [];
+        if (selectedValues.length) {
+            formData.set(fieldName, selectedValues.join(","));
+        }
+    });
 }
 
 function triggerFileDownload(blob, fileName) {
@@ -1248,7 +1256,7 @@ async function fetchLogDiagnostics(file) {
     const payload = await response.json();
 
     if (!response.ok) {
-        throw new Error(payload.error || "ログ診断の実行に失敗しました。");
+        throw new Error(payload.error || "ログ診断の取得に失敗しました。");
     }
 
     return payload;
@@ -1288,7 +1296,7 @@ async function downloadLogDiagnosticsExcel() {
                 const payload = await response.json();
                 errorMessage = payload.error || errorMessage;
             } catch {
-                // Keep the default message when the response body is not JSON.
+                // ignore
             }
             throw new Error(errorMessage);
         }
@@ -1319,7 +1327,7 @@ async function refreshLogProfile() {
     diagnosticRequestVersion += 1;
     isLoadingProfile = true;
     syncSubmitState();
-    setStatus("ヘッダー一覧を読み込んでいます...", "info");
+    setStatus("ヘッダー候補を読み込んでいます...", "info");
 
     try {
         const payload = await fetchLogProfile(selectedFile);
@@ -1330,7 +1338,7 @@ async function refreshLogProfile() {
         requiresFileReselection = false;
         renderProfilePayload(payload);
         saveTopPageState();
-        setStatus("列候補を更新しました。", "success");
+        setStatus("候補を更新しました。", "success");
     } catch (error) {
         if (currentVersion !== profileRequestVersion) {
             return;
@@ -1346,7 +1354,7 @@ async function refreshLogProfile() {
 
 function validateFileSelectionState() {
     if (requiresFileReselection && !csvFileInput?.files?.[0]) {
-        return "前回アップロードしたファイル設定を復元しています。分析またはログ診断を実行するには、CSV ファイルを再選択してください。";
+        return "前回アップロードしたファイル設定を再利用するには、CSV ファイルを選び直してください。";
     }
 
     return "";
@@ -1428,7 +1436,7 @@ function validateFilterColumnSelections() {
 
 function validateAnalyzeForm() {
     if (!Array.isArray(currentProfilePayload?.headers) || !currentProfilePayload.headers.length) {
-        return "ログ情報を取得できていません。ファイルを選び直してください。";
+        return "ログ情報を読み込んでから、分析対象の CSV を選択してください。";
     }
 
     const fileSelectionError = validateFileSelectionState();
@@ -1485,9 +1493,15 @@ function buildAppliedFilterSummary(appliedFilters = {}, columnSettings = {}) {
         .filter((slot) => Boolean(appliedFilters?.[slot]))
         .map((slot) => `${labelMap.get(slot) || DEFAULT_FILTER_LABELS[slot]}: ${appliedFilters[slot]}`));
 
-    return appliedItems.length ? appliedItems.join(" / ") : "フィルタ未適用";
-}
+    if (appliedFilters?.start_activity_values) {
+        appliedItems.push(`開始アクティビティ: ${appliedFilters.start_activity_values}`);
+    }
+    if (appliedFilters?.end_activity_values) {
+        appliedItems.push(`終了アクティビティ: ${appliedFilters.end_activity_values}`);
+    }
 
+    return appliedItems.length ? appliedItems.join(" / ") : "フィルター未適用";
+}
 function buildFilterChipItems(appliedFilters = {}, columnSettings = {}) {
     const filterDefinitions = Array.isArray(columnSettings?.filters) ? columnSettings.filters : [];
     const labelMap = new Map(filterDefinitions.map((definition) => [definition.slot, definition.label]));
@@ -1496,7 +1510,7 @@ function buildFilterChipItems(appliedFilters = {}, columnSettings = {}) {
 
     if (appliedFilters?.date_from || appliedFilters?.date_to) {
         chips.push({
-            icon: "📅",
+            icon: "DATE",
             text: appliedFilters?.date_from && appliedFilters?.date_to
                 ? `${appliedFilters.date_from} - ${appliedFilters.date_to}`
                 : appliedFilters?.date_from
@@ -1504,27 +1518,40 @@ function buildFilterChipItems(appliedFilters = {}, columnSettings = {}) {
                     : `終了日 ${appliedFilters.date_to}`,
         });
     } else {
-        chips.push({ icon: "📅", text: "全期間" });
+        chips.push({ icon: "DATE", text: "全期間" });
     }
 
     FILTER_SLOT_KEYS.forEach((slot, index) => {
         const colName = columnNameMap.get(slot);
         if (appliedFilters?.[slot]) {
             chips.push({
-                icon: ["🏢", "👤", "🏷"][index] || "•",
+                icon: ["F1", "F2", "F3"][index] || "FLT",
                 text: `${labelMap.get(slot) || DEFAULT_FILTER_LABELS[slot]}: ${appliedFilters[slot]}`,
             });
         } else if (colName) {
             chips.push({
-                icon: "📊",
-                text: `${labelMap.get(slot) || DEFAULT_FILTER_LABELS[slot]} グループ集計`,
+                icon: "GRP",
+                text: `${labelMap.get(slot) || DEFAULT_FILTER_LABELS[slot]} グループ設定`,
             });
         }
     });
 
+    if (appliedFilters?.start_activity_values) {
+        chips.push({
+            icon: "START",
+            text: `開始: ${appliedFilters.start_activity_values}`,
+        });
+    }
+
+    if (appliedFilters?.end_activity_values) {
+        chips.push({
+            icon: "END",
+            text: `終了: ${appliedFilters.end_activity_values}`,
+        });
+    }
+
     return chips;
 }
-
 function renderFilterChipBar(appliedFilters = {}, columnSettings = {}) {
     if (!filterChipBar) {
         return;
@@ -1540,7 +1567,7 @@ function renderFilterChipBar(appliedFilters = {}, columnSettings = {}) {
                     <span class="chip-close" aria-hidden="true">×</span>
                 </span>
             `).join("")}
-            <button type="button" class="chip chip-secondary dashboard-filter-add">＋ フィルター追加</button>
+            <button type="button" class="chip chip-secondary dashboard-filter-add">フィルター設定</button>
         </div>
         <div class="dashboard-filter-chipbar-actions">
             <span class="dashboard-filter-chipbar-note">${escapeHtml(buildAppliedFilterSummary(appliedFilters, columnSettings))}</span>
@@ -1567,7 +1594,7 @@ async function fetchDashboardSupplementPayload(runId, analysisKey) {
     const payload = await response.json();
 
     if (!response.ok) {
-        throw new Error(payload.error || "ダッシュボード要約の取得に失敗しました。");
+        throw new Error(payload.error || "ダッシュボード補足の取得に失敗しました。");
     }
 
     return payload;
@@ -1646,20 +1673,20 @@ function renderSummary(data, supplement = currentDashboardSupplement) {
     const dashboard = matchedSupplement?.dashboard || {};
     const diagnostics = currentProfilePayload?.diagnostics || {};
     const activityTypeCount = dashboard?.activity_type_count || diagnostics?.activity_type_count || 0;
-    const avgDurationText = dashboard?.avg_case_duration_text || "算出中";
+    const avgDurationText = dashboard?.avg_case_duration_text || "集計中";
     const avgDurationSubtext = dashboard?.median_case_duration_text
         ? `中央値 ${dashboard.median_case_duration_text}`
         : "中央値を集計中";
     const top10CoverageText = Number.isFinite(Number(dashboard?.top10_variant_coverage_pct))
         ? formatPercent(dashboard.top10_variant_coverage_pct, 1)
-        : "算出中";
+        : "集計中";
     const top10CoverageSubtext = dashboard?.top_bottleneck_avg_wait_text
-        ? `改善対象 ${dashboard.top_bottleneck_avg_wait_text}`
+        ? `最大待ち時間 ${dashboard.top_bottleneck_avg_wait_text}`
         : "上位10パターンを集計中";
     const bottleneckHeadline = dashboard?.top_bottleneck_transition_label || "集計中";
     const bottleneckSubtext = dashboard?.top_bottleneck_avg_wait_text
-        ? `平均 ${dashboard.top_bottleneck_avg_wait_text}`
-        : "平均待ち時間を算出中";
+        ? `平均待ち時間 ${dashboard.top_bottleneck_avg_wait_text}`
+        : "平均待ち時間を集計中";
 
     renderFilterChipBar(data.applied_filters, data.column_settings);
 
@@ -1667,7 +1694,7 @@ function renderSummary(data, supplement = currentDashboardSupplement) {
     summaryPanel.innerHTML = `
         <div class="dashboard-kpi-grid">
             <article class="kpi-card dashboard-kpi-card">
-                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--blue">📋</div>
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--blue">CS</div>
                 <div>
                     <div class="kpi-label">ケース数</div>
                     <div class="kpi-value">${escapeHtml(formatNumber(data.case_count))}</div>
@@ -1675,23 +1702,23 @@ function renderSummary(data, supplement = currentDashboardSupplement) {
                 </div>
             </article>
             <article class="kpi-card dashboard-kpi-card">
-                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--indigo">🔢</div>
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--indigo">ACT</div>
                 <div>
-                    <div class="kpi-label">アクティビティ種類</div>
+                    <div class="kpi-label">アクティビティ種類数</div>
                     <div class="kpi-value">${escapeHtml(formatNumber(activityTypeCount))}</div>
                     <div class="kpi-sub">${escapeHtml(formatNumber(Object.keys(data.analyses || {}).length))} 分析を表示</div>
                 </div>
             </article>
             <article class="kpi-card dashboard-kpi-card">
-                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--emerald">⏱</div>
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--emerald">AVG</div>
                 <div>
-                    <div class="kpi-label">平均スループット</div>
+                    <div class="kpi-label">平均所要時間</div>
                     <div class="kpi-value">${escapeHtml(avgDurationText)}</div>
                     <div class="kpi-sub">${escapeHtml(avgDurationSubtext)}</div>
                 </div>
             </article>
             <article class="kpi-card dashboard-kpi-card">
-                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--amber">🎯</div>
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--amber">TOP</div>
                 <div>
                     <div class="kpi-label">上位10パターンカバー率</div>
                     <div class="kpi-value">${escapeHtml(top10CoverageText)}</div>
@@ -1699,7 +1726,7 @@ function renderSummary(data, supplement = currentDashboardSupplement) {
                 </div>
             </article>
             <article class="kpi-card dashboard-kpi-card dashboard-kpi-card--warning">
-                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--rose">⚠️</div>
+                <div class="kpi-icon dashboard-kpi-icon dashboard-kpi-icon--rose">BOT</div>
                 <div>
                     <div class="kpi-label">最大ボトルネック</div>
                     <div class="kpi-value dashboard-kpi-value--compact">${escapeHtml(bottleneckHeadline)}</div>
@@ -1755,13 +1782,13 @@ function buildGroupKpiCards(groupSummary, groupColumns) {
                 <div class="group-kpi-row">
                     <span class="group-kpi-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
                     <div class="group-kpi-bar-track"><div class="group-kpi-bar-fill group-kpi-bar-fill--duration" style="width:${pct}%"></div></div>
-                    <span class="group-kpi-value">${escapeHtml(String(dur.toFixed ? dur.toFixed(1) : dur))}分</span>
+                    <span class="group-kpi-value">${escapeHtml(String(dur.toFixed ? dur.toFixed(1) : dur))} 分</span>
                 </div>
             `;
         }).join("");
         return `
             <div class="group-kpi-card">
-                <div class="group-kpi-title">📊 ${escapeHtml(firstCol)} 別 平均処理時間(分)</div>
+                <div class="group-kpi-title">${escapeHtml(firstCol)} 別 平均所要時間(分)</div>
                 <div class="group-kpi-card-body">${durRows}</div>
             </div>
         `;
@@ -1770,11 +1797,11 @@ function buildGroupKpiCards(groupSummary, groupColumns) {
     return `
         <div class="group-kpi-panel">
             <div class="group-kpi-card">
-                <div class="group-kpi-title">📊 ${escapeHtml(firstCol)} 別 ケース数</div>
+                <div class="group-kpi-title">${escapeHtml(firstCol)} 別 ケース数</div>
                 <div class="group-kpi-card-body">${caseRows}</div>
             </div>
             <div class="group-kpi-card">
-                <div class="group-kpi-title">📊 ${escapeHtml(firstCol)} 別 イベント数</div>
+                <div class="group-kpi-title">${escapeHtml(firstCol)} 別 イベント数</div>
                 <div class="group-kpi-card-body">${eventRows}</div>
             </div>
             ${durationCard}
@@ -1919,7 +1946,7 @@ function renderAnalysisPanels(analyses, runId, groupColumns = []) {
         });
     });
 
-    // グループタブのイベントリスナー設定（サーバー再分析）
+    // 繧ｰ繝ｫ繝ｼ繝励ち繝悶・繧､繝吶Φ繝医Μ繧ｹ繝翫・險ｭ螳夲ｼ医し繝ｼ繝舌・蜀榊・譫撰ｼ・
     if (isGroupMode) {
         resultPanels.querySelectorAll(".group-tab-bar").forEach((tabBar) => {
             const groupCol = tabBar.dataset.groupCol;
@@ -1930,9 +1957,9 @@ function renderAnalysisPanels(analyses, runId, groupColumns = []) {
                     const slotIndex = findFilterSlotByColumn(groupCol);
 
                     if (selectedValue) {
-                        // グループ値を選択 → そのスロットをフィルタリングモードに切り替えて再分析
+                        // 繧ｰ繝ｫ繝ｼ繝怜､繧帝∈謚・竊・縺昴・繧ｹ繝ｭ繝・ヨ繧偵ヵ繧｣繝ｫ繧ｿ繝ｪ繝ｳ繧ｰ繝｢繝ｼ繝峨↓蛻・ｊ譖ｿ縺医※蜀榊・譫・
                         if (slotIndex >= 0) {
-                            // 下位スロットのフィルター値をクリア（次の階層はグループモードのまま）
+                            // 荳倶ｽ阪せ繝ｭ繝・ヨ縺ｮ繝輔ぅ繝ｫ繧ｿ繝ｼ蛟､繧偵け繝ｪ繧｢・域ｬ｡縺ｮ髫主ｱ､縺ｯ繧ｰ繝ｫ繝ｼ繝励Δ繝ｼ繝峨・縺ｾ縺ｾ・・
                             for (let i = slotIndex + 1; i < filterColumnRefs.length; i++) {
                                 if (filterColumnRefs[i].valueSelect) {
                                     filterColumnRefs[i].valueSelect.value = "";
@@ -1941,7 +1968,7 @@ function renderAnalysisPanels(analyses, runId, groupColumns = []) {
                             filterColumnRefs[slotIndex].valueSelect.value = selectedValue;
                         }
                     } else {
-                        // 「全体」タブ → 全スロットのフィルター値をクリアして再分析
+                        // 縲悟・菴薙阪ち繝・竊・蜈ｨ繧ｹ繝ｭ繝・ヨ縺ｮ繝輔ぅ繝ｫ繧ｿ繝ｼ蛟､繧偵け繝ｪ繧｢縺励※蜀榊・譫・
                         filterColumnRefs.forEach((ref) => {
                             if (ref.valueSelect) ref.valueSelect.value = "";
                         });
@@ -1952,12 +1979,12 @@ function renderAnalysisPanels(analyses, runId, groupColumns = []) {
             });
         });
 
-        // パンくずの「戻る」クリック → 上位階層に戻って再分析
+        // 繝代Φ縺上★縺ｮ縲梧綾繧九阪け繝ｪ繝・け 竊・荳贋ｽ埼嚴螻､縺ｫ謌ｻ縺｣縺ｦ蜀榊・譫・
         resultPanels.querySelectorAll(".breadcrumb-item--link").forEach((crumb) => {
             crumb.addEventListener("click", () => {
                 const drillIndex = Number.parseInt(crumb.dataset.drillIndex ?? "-1", 10);
-                // drillIndex=-1 → 全体（全スロットクリア）
-                // drillIndex=n → n+1階層より下をクリア
+                // drillIndex=-1 竊・蜈ｨ菴難ｼ亥・繧ｹ繝ｭ繝・ヨ繧ｯ繝ｪ繧｢・・
+                // drillIndex=n 竊・n+1髫主ｱ､繧医ｊ荳九ｒ繧ｯ繝ｪ繧｢
                 const clearFrom = drillIndex + 1;
                 for (let i = clearFrom; i < filterColumnRefs.length; i++) {
                     if (filterColumnRefs[i].valueSelect) {
@@ -2008,6 +2035,7 @@ form.addEventListener("submit", async (event) => {
 
     try {
         const formData = new FormData(form);
+        appendActivityEndpointFilterSettings(formData);
         const response = await fetch("/api/analyze", {
             method: "POST",
             body: formData,
@@ -2022,7 +2050,6 @@ form.addEventListener("submit", async (event) => {
         renderDashboard(data);
         saveTopPageState();
         setSetupSectionOpen(false);
-
         setStatus("分析が完了しました。", "success");
     } catch (error) {
         setStatus(error.message, "error");
@@ -2079,6 +2106,13 @@ filterColumnRefs.forEach((filterRef) => {
     });
 });
 
+[startActivityValuesSelect, endActivityValuesSelect].forEach((element) => {
+    element?.addEventListener("change", () => {
+        hideStatus();
+        renderFilterChipBar(loadLatestResult()?.applied_filters, loadLatestResult()?.column_settings);
+        saveTopPageState();
+    });
+});
 form.querySelectorAll('input[name="analysis_keys"]').forEach((element) => {
     element.addEventListener("change", () => {
         hideStatus();
@@ -2105,17 +2139,20 @@ resetFilterButton?.addEventListener("click", () => {
     if (analysisDateToInput) analysisDateToInput.value = "";
     filterColumnRefs.forEach((filterRef) => {
         if (filterRef.columnSelect) filterRef.columnSelect.value = "";
-        replaceSelectOptions(filterRef.valueSelect, [], "", "全て");
+        replaceSelectOptions(filterRef.valueSelect, [], "", "すべて");
         if (filterRef.valueSelect) filterRef.valueSelect.disabled = true;
     });
+    replaceMultiSelectOptions(startActivityValuesSelect, [], []);
+    replaceMultiSelectOptions(endActivityValuesSelect, [], []);
+    if (startActivityValuesSelect) startActivityValuesSelect.disabled = true;
+    if (endActivityValuesSelect) endActivityValuesSelect.disabled = true;
     if (filterSelectionNote) {
-        filterSelectionNote.textContent = "分析対象条件ごとに対象列を設定すると、絞り込み値を選択できます。";
+        filterSelectionNote.textContent = "分析対象にしたい列を選ぶと、絞り込み候補を選択できます。";
     }
     hideStatus();
     renderFilterChipBar();
     saveTopPageState();
 });
-
 const latestResult = loadLatestResult();
 renderFilterChipBar(latestResult?.applied_filters, latestResult?.column_settings);
 if (latestResult) {
@@ -2130,4 +2167,14 @@ setSetupSectionOpen(Boolean(requiresFileReselection));
 saveTopPageState();
 syncSubmitState();
 hideStatus();
+
+
+
+
+
+
+
+
+
+
 

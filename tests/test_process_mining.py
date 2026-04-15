@@ -15,6 +15,7 @@ from 共通スクリプト.analysis_service import (
     create_variant_flow_snapshot,
     create_variant_summary,
     detect_group_columns,
+    filter_by_start_end_activity,
     filter_prepared_df,
     get_filter_options,
     normalize_filter_column_settings,
@@ -340,6 +341,58 @@ class ProcessMiningTestCase(unittest.TestCase):
         self.assertEqual("exclude", normalized["activity_mode"])
         self.assertEqual("Submit,Approve", normalized["activity_values"])
 
+    def test_normalize_filter_params_trims_start_end_activity_values(self):
+        normalized = normalize_filter_params(
+            start_activity_values=[" Submit ", "", "Review", "Submit"],
+            end_activity_values=" Done , Reject , Done ",
+        )
+
+        self.assertEqual("Submit,Review", normalized["start_activity_values"])
+        self.assertEqual("Done,Reject", normalized["end_activity_values"])
+
+    def test_filter_by_start_end_activity_filters_cases_by_boundary_events(self):
+        df = pd.DataFrame(
+            [
+                {"case_id": "C001", "activity": "Submit", "timestamp": pd.Timestamp("2024-01-01 09:00:00")},
+                {"case_id": "C001", "activity": "Approve", "timestamp": pd.Timestamp("2024-01-01 09:05:00")},
+                {"case_id": "C001", "activity": "Done", "timestamp": pd.Timestamp("2024-01-01 09:10:00")},
+                {"case_id": "C002", "activity": "Intake", "timestamp": pd.Timestamp("2024-01-01 10:00:00")},
+                {"case_id": "C002", "activity": "Approve", "timestamp": pd.Timestamp("2024-01-01 10:05:00")},
+                {"case_id": "C002", "activity": "Done", "timestamp": pd.Timestamp("2024-01-01 10:10:00")},
+                {"case_id": "C003", "activity": "Submit", "timestamp": pd.Timestamp("2024-01-01 11:00:00")},
+                {"case_id": "C003", "activity": "Check", "timestamp": pd.Timestamp("2024-01-01 11:05:00")},
+                {"case_id": "C003", "activity": "Reject", "timestamp": pd.Timestamp("2024-01-01 11:10:00")},
+            ]
+        )
+
+        start_filtered = filter_by_start_end_activity(
+            df,
+            "case_id",
+            "activity",
+            "timestamp",
+            start_activities=["Submit"],
+        )
+        self.assertEqual({"C001", "C003"}, set(start_filtered["case_id"].unique()))
+
+        end_filtered = filter_by_start_end_activity(
+            df,
+            "case_id",
+            "activity",
+            "timestamp",
+            end_activities=["Done"],
+        )
+        self.assertEqual({"C001", "C002"}, set(end_filtered["case_id"].unique()))
+
+        boundary_filtered = filter_by_start_end_activity(
+            df,
+            "case_id",
+            "activity",
+            "timestamp",
+            start_activities=["Submit"],
+            end_activities=["Done"],
+        )
+        self.assertEqual({"C001"}, set(boundary_filtered["case_id"].unique()))
+
     def test_filter_prepared_df_filters_by_date_and_attributes(self):
         raw_df = pd.DataFrame(
             [
@@ -412,6 +465,39 @@ class ProcessMiningTestCase(unittest.TestCase):
         self.assertEqual(["Submit", "Submit"], included_df["activity"].tolist())
         self.assertEqual(["Approve", "Reject"], excluded_df["activity"].tolist())
 
+    def test_filter_prepared_df_filters_by_start_and_end_activity(self):
+        raw_df = pd.DataFrame(
+            [
+                {"case": "C001", "step": "Submit", "ts": "2024-01-01 09:00:00"},
+                {"case": "C001", "step": "Approve", "ts": "2024-01-01 09:05:00"},
+                {"case": "C001", "step": "Done", "ts": "2024-01-01 09:10:00"},
+                {"case": "C002", "step": "Intake", "ts": "2024-01-01 10:00:00"},
+                {"case": "C002", "step": "Approve", "ts": "2024-01-01 10:05:00"},
+                {"case": "C002", "step": "Done", "ts": "2024-01-01 10:10:00"},
+                {"case": "C003", "step": "Submit", "ts": "2024-01-01 11:00:00"},
+                {"case": "C003", "step": "Check", "ts": "2024-01-01 11:05:00"},
+                {"case": "C003", "step": "Reject", "ts": "2024-01-01 11:10:00"},
+            ]
+        )
+        prepared_df = prepare_event_log(
+            df=raw_df,
+            case_id_column="case",
+            activity_column="step",
+            timestamp_column="ts",
+        )
+
+        filtered_df = filter_prepared_df(
+            prepared_df,
+            {
+                "start_activity_values": "Submit",
+                "end_activity_values": "Done",
+            },
+            {},
+        )
+
+        self.assertEqual({"C001"}, set(filtered_df["case_id"].unique()))
+        self.assertEqual(["Submit", "Approve", "Done"], filtered_df["activity"].tolist())
+
     def test_get_filter_options_returns_sorted_unique_values(self):
         raw_df = pd.DataFrame(
             [
@@ -439,6 +525,7 @@ class ProcessMiningTestCase(unittest.TestCase):
         self.assertEqual(["HR", "Sales"], options["filters"][0]["options"])
         self.assertEqual(["API", "Mail", "Web"], options["filters"][1]["options"])
         self.assertEqual(["A", "B"], options["filters"][2]["options"])
+        self.assertEqual(["Approve", "Review", "Submit"], options["all_activity_names"])
 
     def test_normalize_filter_column_settings_accepts_stored_slot_shape(self):
         normalized = normalize_filter_column_settings(

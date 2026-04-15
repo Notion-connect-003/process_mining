@@ -52,7 +52,15 @@ FLOW_PATH_SEPARATOR = "→"
 FLOW_PATTERN_CAP = 500
 FLOW_LAYOUT_SWEEP_ITERATIONS = 4
 FILTER_SLOT_KEYS = ("filter_value_1", "filter_value_2", "filter_value_3")
-FILTER_PARAM_KEYS = ("date_from", "date_to", *FILTER_SLOT_KEYS)
+FILTER_PARAM_KEYS = (
+    "date_from",
+    "date_to",
+    *FILTER_SLOT_KEYS,
+    "activity_mode",
+    "activity_values",
+    "start_activity_values",
+    "end_activity_values",
+)
 DEFAULT_FILTER_LABELS = {
     "filter_value_1": "グループ/カテゴリー フィルター①",
     "filter_value_2": "グループ/カテゴリー フィルター②",

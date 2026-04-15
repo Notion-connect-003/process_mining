@@ -20,20 +20,17 @@ def normalize_filter_params(
     filter_value_3=None,
     activity_mode=None,
     activity_values=None,
+    start_activity_values=None,
+    end_activity_values=None,
     **_,
 ):
     normalized_activity_mode = str(activity_mode or "").strip().lower()
     if normalized_activity_mode not in {"include", "exclude"}:
         normalized_activity_mode = None
 
-    if isinstance(activity_values, (list, tuple, set)):
-        raw_activity_values = [str(value or "").strip() for value in activity_values]
-    else:
-        raw_activity_values = [
-            value.strip()
-            for value in str(activity_values or "").split(",")
-        ]
-    normalized_activity_values = list(dict.fromkeys([value for value in raw_activity_values if value]))
+    normalized_activity_values = _normalize_multi_value_param(activity_values)
+    normalized_start_activity_values = _normalize_multi_value_param(start_activity_values)
+    normalized_end_activity_values = _normalize_multi_value_param(end_activity_values)
 
     raw_params = {
         "date_from": date_from,
@@ -43,12 +40,22 @@ def normalize_filter_params(
         "filter_value_3": filter_value_3,
         "activity_mode": normalized_activity_mode,
         "activity_values": ",".join(normalized_activity_values) if normalized_activity_values else None,
+        "start_activity_values": ",".join(normalized_start_activity_values) if normalized_start_activity_values else None,
+        "end_activity_values": ",".join(normalized_end_activity_values) if normalized_end_activity_values else None,
     }
 
     return {
         filter_key: (str(filter_value).strip() if str(filter_value or "").strip() else None)
         for filter_key, filter_value in raw_params.items()
     }
+
+
+def _normalize_multi_value_param(raw_value):
+    if isinstance(raw_value, (list, tuple, set)):
+        values = [str(value or "").strip() for value in raw_value]
+    else:
+        values = [value.strip() for value in str(raw_value or "").split(",")]
+    return list(dict.fromkeys([value for value in values if value]))
 
 
 def _normalize_filter_slot_setting(filter_key, raw_setting):
@@ -319,6 +326,48 @@ def build_group_summary(prepared_df, group_columns):
     return summary
 
 
+def filter_by_start_end_activity(
+    df,
+    case_id_column,
+    activity_column,
+    timestamp_column,
+    start_activities=None,
+    end_activities=None,
+):
+    normalized_start_activities = _normalize_multi_value_param(start_activities)
+    normalized_end_activities = _normalize_multi_value_param(end_activities)
+
+    if not normalized_start_activities and not normalized_end_activities:
+        return df
+
+    required_columns = [case_id_column, activity_column, timestamp_column]
+    if df.empty or any(column_name not in df.columns for column_name in required_columns):
+        return df
+
+    sort_columns = [case_id_column, timestamp_column]
+    if "sequence_no" in df.columns and "sequence_no" not in sort_columns:
+        sort_columns.append("sequence_no")
+
+    ranked_df = df.sort_values(sort_columns, kind="mergesort")
+    valid_case_ids = set(ranked_df[case_id_column].dropna().unique().tolist())
+
+    if normalized_start_activities:
+        first_events = ranked_df.groupby(case_id_column, sort=False).first()
+        start_case_ids = set(
+            first_events[first_events[activity_column].astype(str).str.strip().isin(normalized_start_activities)].index.tolist()
+        )
+        valid_case_ids &= start_case_ids
+
+    if normalized_end_activities:
+        last_events = ranked_df.groupby(case_id_column, sort=False).last()
+        end_case_ids = set(
+            last_events[last_events[activity_column].astype(str).str.strip().isin(normalized_end_activities)].index.tolist()
+        )
+        valid_case_ids &= end_case_ids
+
+    return df[df[case_id_column].isin(valid_case_ids)]
+
+
 def filter_prepared_df(prepared_df, filter_params=None, filter_column_settings=None):
     if not filter_params:
         return prepared_df
@@ -347,12 +396,17 @@ def filter_prepared_df(prepared_df, filter_params=None, filter_column_settings=N
             filtered_df[column_name].astype(str).str.strip() == filter_value
         ]
 
+    filtered_df = filter_by_start_end_activity(
+        filtered_df,
+        "case_id",
+        "activity",
+        "timestamp",
+        start_activities=normalized_filters.get("start_activity_values"),
+        end_activities=normalized_filters.get("end_activity_values"),
+    )
+
     activity_mode = normalized_filters.get("activity_mode")
-    activity_values = [
-        value.strip()
-        for value in str(normalized_filters.get("activity_values") or "").split(",")
-        if value.strip()
-    ]
+    activity_values = _normalize_multi_value_param(normalized_filters.get("activity_values"))
     if activity_mode in {"include", "exclude"} and activity_values and "activity" in filtered_df.columns:
         activity_mask = filtered_df["activity"].astype(str).str.strip().isin(activity_values)
         # Case-level filtering: keep all events of cases that contain (or don't contain) the target activity.
@@ -366,6 +420,22 @@ def filter_prepared_df(prepared_df, filter_params=None, filter_column_settings=N
 def get_filter_options(prepared_df, filter_column_settings=None):
     normalized_column_settings = normalize_filter_column_settings(**(filter_column_settings or {}))
     filters = []
+    all_activity_names = []
+
+    if "activity" in prepared_df.columns:
+        activity_values = (
+            prepared_df["activity"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+        )
+        all_activity_names = sorted(
+            {
+                value
+                for value in activity_values.tolist()
+                if value
+            }
+        )
 
     for filter_key in FILTER_SLOT_KEYS:
         column_name = normalized_column_settings[filter_key]["column_name"]
@@ -396,7 +466,10 @@ def get_filter_options(prepared_df, filter_column_settings=None):
             }
         )
 
-    return {"filters": filters}
+    return {
+        "filters": filters,
+        "all_activity_names": all_activity_names,
+    }
 
 
 def create_log_diagnostics(

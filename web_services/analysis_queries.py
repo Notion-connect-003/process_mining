@@ -32,6 +32,8 @@ FILTER_PARAM_NAMES = (
     "filter_value_3",
     "activity_mode",
     "activity_values",
+    "start_activity_values",
+    "end_activity_values",
 )
 
 PROCESS_FLOW_PATTERN_CAP = 300

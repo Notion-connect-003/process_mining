@@ -219,8 +219,25 @@ def query_group_summary(parquet_path, group_columns, filter_params=None, filter_
 def query_filter_options(parquet_path, filter_column_settings=None):
     normalized_settings = normalize_filter_column_settings(**(filter_column_settings or {}))
     filters = []
+    all_activity_names = []
     connection = duckdb.connect()
     try:
+        if "activity" in _get_parquet_column_names(parquet_path):
+            try:
+                activity_rows = connection.execute(
+                    """
+                    SELECT DISTINCT TRIM(CAST(activity AS VARCHAR)) AS val
+                    FROM read_parquet(?)
+                    WHERE activity IS NOT NULL
+                      AND TRIM(CAST(activity AS VARCHAR)) <> ''
+                    ORDER BY val
+                    """,
+                    [str(parquet_path)],
+                ).fetchall()
+                all_activity_names = [str(row[0]) for row in activity_rows]
+            except Exception:
+                all_activity_names = []
+
         for filter_key in FILTER_SLOT_KEYS:
             column_name = normalized_settings[filter_key]["column_name"]
             label = normalized_settings[filter_key]["label"]
@@ -249,7 +266,10 @@ def query_filter_options(parquet_path, filter_column_settings=None):
                     "options": options,
                 }
             )
-        return {"filters": filters}
+        return {
+            "filters": filters,
+            "all_activity_names": all_activity_names,
+        }
     finally:
         connection.close()
 

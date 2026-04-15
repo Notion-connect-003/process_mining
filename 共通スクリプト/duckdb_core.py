@@ -138,7 +138,7 @@ def _parse_filter_datetime(value, is_end=False):
     return parsed_value
 
 
-def _normalize_activity_values(raw_value):
+def _normalize_multi_value_filter(raw_value):
     if isinstance(raw_value, (list, tuple, set)):
         values = [str(value or "").strip() for value in raw_value]
     else:
@@ -182,8 +182,72 @@ def _build_scoped_relation_cte(
     ctes.append(f"filtered_base AS ({base_query})")
     current_relation = "filtered_base"
 
+    start_activity_values = _normalize_multi_value_filter(normalized_filters.get("start_activity_values"))
+    end_activity_values = _normalize_multi_value_filter(normalized_filters.get("end_activity_values"))
+    if start_activity_values or end_activity_values:
+        case_endpoint_clauses = []
+        case_endpoint_params = []
+
+        if start_activity_values:
+            start_placeholders = ", ".join("?" for _ in start_activity_values)
+            case_endpoint_clauses.append(
+                f"""
+                case_id IN (
+                    SELECT case_id
+                    FROM case_endpoint_ranked
+                    WHERE rn_first = 1
+                      AND TRIM(CAST(activity AS VARCHAR)) IN ({start_placeholders})
+                )
+                """.strip()
+            )
+            case_endpoint_params.extend(start_activity_values)
+
+        if end_activity_values:
+            end_placeholders = ", ".join("?" for _ in end_activity_values)
+            case_endpoint_clauses.append(
+                f"""
+                case_id IN (
+                    SELECT case_id
+                    FROM case_endpoint_ranked
+                    WHERE rn_last = 1
+                      AND TRIM(CAST(activity AS VARCHAR)) IN ({end_placeholders})
+                )
+                """.strip()
+            )
+            case_endpoint_params.extend(end_activity_values)
+
+        ctes.append(
+            f"""
+            case_endpoint_ranked AS (
+                SELECT
+                    *,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY case_id
+                        ORDER BY COALESCE(start_time, timestamp) ASC, sequence_no ASC, activity ASC
+                    ) AS rn_first,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY case_id
+                        ORDER BY COALESCE(start_time, timestamp) DESC, sequence_no DESC, activity DESC
+                    ) AS rn_last
+                FROM {current_relation}
+            ),
+            case_endpoint_valid AS (
+                SELECT DISTINCT case_id
+                FROM case_endpoint_ranked
+                WHERE {' AND '.join(case_endpoint_clauses)}
+            ),
+            case_endpoint_scoped AS (
+                SELECT scoped.*
+                FROM {current_relation} AS scoped
+                INNER JOIN case_endpoint_valid USING (case_id)
+            )
+            """.strip()
+        )
+        params.extend(case_endpoint_params)
+        current_relation = "case_endpoint_scoped"
+
     activity_mode = normalized_filters.get("activity_mode")
-    activity_values = _normalize_activity_values(normalized_filters.get("activity_values"))
+    activity_values = _normalize_multi_value_filter(normalized_filters.get("activity_values"))
     if activity_mode in {"include", "exclude"} and activity_values:
         placeholders = ", ".join("?" for _ in activity_values)
         operator = "IN" if activity_mode == "include" else "NOT IN"

@@ -403,10 +403,16 @@ def build_ai_fallback_text(ai_context):
     )
 
     if analysis_key == "frequency":
+        top_activity_name = (
+            top_row.get("アクティビティ")
+            or top_row.get("アクティビティ名")
+            or "不明"
+        )
+        top_event_count = top_row.get("イベント件数", top_row.get("イベント数", 0))
         if top_row:
             overall_trend_text = (
-                f"最もイベント件数が多いアクティビティは「{top_row.get('アクティビティ名', '不明')}」"
-                f"（{normalize_excel_cell_value(top_row.get('イベント数', 0))} 件）"
+                f"最もイベント件数が多いアクティビティは「{top_activity_name}」"
+                f"（{normalize_excel_cell_value(top_event_count)} 件）"
                 f"で、比率 {normalize_excel_cell_value(top_row.get('イベント比率(%)', 0))}%を占めます。"
             )
         else:
@@ -415,7 +421,7 @@ def build_ai_fallback_text(ai_context):
         attention_lines = []
         if top_row:
             attention_lines.append(
-                f"- 「{top_row.get('アクティビティ名', '不明')}」のイベント件数が突出"
+                f"- 「{top_activity_name}」のイベント件数が突出"
                 f"しており、業務負荷が集中している可能性があります。"
             )
         if top_activity_bottleneck:

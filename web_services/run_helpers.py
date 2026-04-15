@@ -25,6 +25,8 @@ FILTER_PARAM_NAMES = (
     "filter_value_3",
     "activity_mode",
     "activity_values",
+    "start_activity_values",
+    "end_activity_values",
 )
 FILTER_COLUMN_NAMES = ("filter_column_1", "filter_column_2", "filter_column_3")
 FILTER_LABEL_NAMES = ("filter_label_1", "filter_label_2", "filter_label_3")
@@ -113,7 +115,7 @@ def get_run_data(run_id):
     run_data = RUN_STORE.get(run_id)
 
     if not run_data:
-        raise HTTPException(status_code=404, detail="実行データが見つかりません。")
+        raise HTTPException(status_code=404, detail="分析データが見つかりません。")
 
     RUN_STORE.move_to_end(run_id)
     return run_data
@@ -225,5 +227,13 @@ def build_filter_summary_text(filter_params, column_settings):
             else "アクティビティ 除外"
         )
         summary_items.append(f"{activity_label}: {activity_values}")
+
+    start_activity_values = normalized_filters.get("start_activity_values")
+    if start_activity_values:
+        summary_items.append(f"開始アクティビティ: {start_activity_values}")
+
+    end_activity_values = normalized_filters.get("end_activity_values")
+    if end_activity_values:
+        summary_items.append(f"終了アクティビティ: {end_activity_values}")
 
     return " / ".join(summary_items) if summary_items else "未適用"

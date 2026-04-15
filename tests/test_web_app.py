@@ -666,6 +666,101 @@ class WebAppTestCase(unittest.TestCase):
         for header in ("標準偏差(分)", "75%点(分)", "90%点(分)", "95%点(分)"):
             self.assertIn(header, frequency_headers)
 
+    def test_analyze_api_applies_start_end_activity_filters_to_preview_and_detail(self):
+        run_id = self.analyze_uploaded_csv(
+            "\n".join(
+                [
+                    "case_id,activity,start_time",
+                    "C001,Submit,2024-01-01 09:00:00",
+                    "C001,Approve,2024-01-01 09:05:00",
+                    "C001,Done,2024-01-01 09:10:00",
+                    "C002,Intake,2024-01-01 10:00:00",
+                    "C002,Approve,2024-01-01 10:05:00",
+                    "C002,Done,2024-01-01 10:10:00",
+                    "C003,Submit,2024-01-01 11:00:00",
+                    "C003,Check,2024-01-01 11:05:00",
+                    "C003,Reject,2024-01-01 11:10:00",
+                ]
+            ),
+            analysis_keys=["frequency"],
+            extra_data={
+                "start_activity_values": "Submit",
+                "end_activity_values": "Done",
+            },
+        )
+
+        detail_response = self.client.get(f"/api/runs/{run_id}/analyses/frequency")
+        self.assertEqual(200, detail_response.status_code)
+
+        payload = detail_response.json()
+        self.assertEqual(1, payload["case_count"])
+        self.assertEqual(3, payload["event_count"])
+        self.assertEqual("Submit", payload["applied_filters"]["start_activity_values"])
+        self.assertEqual("Done", payload["applied_filters"]["end_activity_values"])
+
+    def test_filter_options_api_returns_all_activity_names_for_start_end_filters(self):
+        run_id = self.analyze_uploaded_csv(
+            "\n".join(
+                [
+                    "case_id,activity,start_time",
+                    "C001,Submit,2024-01-01 09:00:00",
+                    "C001,Approve,2024-01-01 09:05:00",
+                    "C001,Done,2024-01-01 09:10:00",
+                    "C002,Intake,2024-01-01 10:00:00",
+                    "C002,Done,2024-01-01 10:10:00",
+                ]
+            ),
+            analysis_keys=["frequency"],
+        )
+
+        response = self.client.get(f"/api/runs/{run_id}/filter-options")
+        self.assertEqual(200, response.status_code)
+
+        payload = response.json()
+        self.assertEqual(
+            ["Approve", "Done", "Intake", "Submit"],
+            payload["options"]["all_activity_names"],
+        )
+
+    def test_frequency_ai_fallback_uses_actual_activity_name_and_event_count(self):
+        run_id = self.analyze_uploaded_csv(
+            "\n".join(
+                [
+                    "case_id,activity,start_time",
+                    "C001,Submit,2024-01-01 09:00:00",
+                    "C001,Approve,2024-01-01 10:00:00",
+                    "C002,Submit,2024-01-02 09:00:00",
+                    "C002,Approve,2024-01-02 10:00:00",
+                    "C003,Submit,2024-01-03 09:00:00",
+                    "C003,Reject,2024-01-03 10:00:00",
+                ]
+            ),
+            analysis_keys=["frequency"],
+        )
+
+        with mock.patch(
+            "web_app.request_ollama_insights_text",
+            side_effect=web_app.httpx.ConnectError("offline"),
+        ):
+            response = self.client.get(
+                f"/api/runs/{run_id}/report-excel?analysis_key=frequency"
+            )
+
+        self.assertEqual(200, response.status_code)
+
+        workbook = load_workbook(BytesIO(response.content))
+        ai_sheet = workbook["分析コメント"]
+        explanation_row = self.find_row_by_value(ai_sheet, "解説本文")
+        explanation_text = "\n".join(
+            str(ai_sheet.cell(row=row_index, column=1).value or "")
+            for row_index in range(explanation_row + 1, ai_sheet.max_row + 1)
+        )
+
+        self.assertIn("Submit", explanation_text)
+        self.assertIn("3 件", explanation_text)
+        self.assertNotIn("「不明」", explanation_text)
+        self.assertNotIn("0 件", explanation_text)
+
     def test_report_excel_export_api_returns_transition_workbook(self):
         run_id = self.analyze_uploaded_csv(
             "\n".join(
