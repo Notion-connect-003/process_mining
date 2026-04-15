@@ -305,7 +305,7 @@ def register_detail_routes(
                         run_data,
                         analysis_key,
                         filter_params,
-                        generate_text=lambda *_args, **_kwargs: "",
+                        # generate_text を省略 → デフォルトの request_ollama_insights_text が使用される
                     )
                     excel_bytes = build_detail_export_workbook_bytes(
                         run_data=run_data,
