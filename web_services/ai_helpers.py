@@ -43,159 +43,6 @@ def serialize_ai_prompt_rows(rows, max_items=5):
     return json.dumps(serialized_rows, ensure_ascii=False, indent=2)
 
 
-def build_analysis_ai_prompt(ai_context):
-    analysis_key = str(ai_context["analysis_key"]).strip().lower()
-    analysis_name = ai_context["analysis_name"]
-    focus_map = {
-        "frequency": {
-            "focus": "\u4ef6\u6570\u304c\u96c6\u4e2d\u3057\u3066\u3044\u308b\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u3068\u3001\u5e73\u5747\u51e6\u7406\u6642\u9593\u304c\u9577\u3044\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u3092\u7279\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "priority": "\u983b\u5ea6\u306e\u504f\u308a\u3001\u51e6\u7406\u6642\u9593\u3001\u3070\u3089\u3064\u304d\u306e3\u70b9\u3092\u7d44\u307f\u5408\u308f\u305b\u3066\u3001\u6539\u5584\u4f59\u5730\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "actions": "\u5165\u53e3\u51e6\u7406\u306e\u898b\u76f4\u3057\u3001\u91cd\u8907\u4f5c\u696d\u306e\u524a\u6e1b\u3001\u6ede\u7559\u30b1\u30fc\u30b9\u306e\u78ba\u8a8d\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "constraint": "頻度分析では「バリアント」「パターン」という用語は使わず、アクティビティ単位の傾向に焦点を当ててください。",
-        },
-        "transition": {
-            "focus": "\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u306b\u306a\u3063\u3066\u3044\u308b\u9077\u79fb\u3068\u3001\u305d\u306e\u524d\u5f8c\u306e\u51e6\u7406\u306e\u3064\u306a\u304c\u308a\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "priority": "\u9077\u79fb\u6642\u9593\u306e\u9577\u3055\u3001\u6539\u5584\u30a4\u30f3\u30d1\u30af\u30c8\u3001\u95a2\u9023\u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u306e\u504f\u308a\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "actions": "\u524d\u5f8c\u5de5\u7a0b\u306e\u5f15\u304d\u7d99\u304e\u3001\u5f85\u3061\u6642\u9593\u3001\u627f\u8a8d\u7d4c\u8def\u306e\u898b\u76f4\u3057\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "constraint": "前後処理分析では「バリアント」「パターン」という用語は使わず、遷移（前後のアクティビティのつながり）に焦点を当ててください。",
-        },
-        "pattern": {
-            "focus": "\u4e3b\u8981\u30d1\u30bf\u30fc\u30f3\u3068\u4f8b\u5916\u30d1\u30bf\u30fc\u30f3\u306e\u5dee\u3092\u660e\u78ba\u306b\u3057\u3001\u3069\u306e\u9806\u5e8f\u306b\u6539\u5584\u4f59\u5730\u304c\u3042\u308b\u304b\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "priority": "\u51fa\u73fe\u983b\u5ea6\u3001\u51e6\u7406\u6642\u9593\u3001\u5206\u5c90\u306e\u9055\u3044\u304b\u3089\u6539\u5584\u4f59\u5730\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "actions": "\u4f8b\u5916\u30eb\u30fc\u30c8\u306e\u539f\u56e0\u7279\u5b9a\u3084\u6a19\u6e96\u30eb\u30fc\u30c8\u3078\u306e\u96c6\u7d04\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "constraint": "",
-        },
-    }
-    focus_config = focus_map.get(
-        analysis_key,
-        {
-            "focus": "\u4e3b\u8981\u306a\u50be\u5411\u3068\u3001\u305d\u3053\u304b\u3089\u898b\u3048\u308b\u8ab2\u984c\u3092\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "priority": "\u51e6\u7406\u6642\u9593\u3001\u4ef6\u6570\u3001\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u306e\u89b3\u70b9\u3092\u6574\u7406\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-            "actions": "\u73fe\u5834\u3067\u6b21\u306b\u78ba\u8a8d\u3059\u3079\u304d\u30a2\u30af\u30b7\u30e7\u30f3\u306b\u3064\u306a\u304c\u308b\u793a\u5506\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044\u3002",
-        },
-    )
-
-    group_columns = ai_context.get("group_columns", [])
-    group_summary = ai_context.get("group_summary", [])
-    comparable_group_rows = [
-        row
-        for row in group_summary
-        if str(row.get("value") or row.get("\u5024") or "") != "\u5168\u4f53"
-    ]
-
-    group_prompt_section = ""
-    group_instruction = ""
-    if len(comparable_group_rows) >= 2:
-        group_prompt_section = f"""
-
-## \u30b0\u30eb\u30fc\u30d7\u5225\u96c6\u8a08\uff08\u30b0\u30eb\u30fc\u30d4\u30f3\u30b0\u8ef8: {"\u3001".join(group_columns)}\uff09
-{serialize_ai_prompt_rows(group_summary, max_items=10)}
-"""
-        group_instruction = """
-【\u30b0\u30eb\u30fc\u30d7\u9593\u6bd4\u8f03】
-\u30b0\u30eb\u30fc\u30d7\u5225\u96c6\u8a08\u30c7\u30fc\u30bf\u306b\u57fa\u3065\u304d\u3001\u30b0\u30eb\u30fc\u30d7\u9593\u306e\u7279\u5fb4\u7684\u306a\u9055\u3044\u30922\u301c3\u70b9\u6307\u6458\u3057\u3066\u304f\u3060\u3055\u3044\u3002
-\u4ee5\u4e0b\u306e\u89b3\u70b9\u3092\u91cd\u8996\u3057\u3066\u304f\u3060\u3055\u3044:
-- \u30b1\u30fc\u30b9\u6570\u30fb\u30a4\u30d9\u30f3\u30c8\u6570\u306e\u504f\u308a\u304c\u3042\u308b\u30b0\u30eb\u30fc\u30d7
-- \u30b0\u30eb\u30fc\u30d7\u9593\u3067\u5e73\u5747\u51e6\u7406\u6642\u9593\u306b\u5dee\u304c\u3042\u308b\u30dd\u30a4\u30f3\u30c8
-- \u7279\u5b9a\u306e\u30b0\u30eb\u30fc\u30d7\u3067\u9855\u8457\u306a\u7279\u5fb4\uff08\u51e6\u7406\u6642\u9593\u304c\u7a81\u51fa\u3057\u3066\u9577\u3044/\u77ed\u3044\u7b49\uff09
-
-"""
-
-    constraint_line = f"- {focus_config['constraint']}" if focus_config.get('constraint') else ""
-    return f"""\u3042\u306a\u305f\u306f\u30d7\u30ed\u30bb\u30b9\u30de\u30a4\u30cb\u30f3\u30b0\u306e\u5206\u6790\u7d50\u679c\u3092\u8981\u7d04\u3059\u308b\u30a2\u30ca\u30ea\u30b9\u30c8\u3067\u3059\u3002\u4ee5\u4e0b\u306e\u5206\u6790\u7d50\u679c\u306b\u57fa\u3065\u304d\u3001\u7c21\u6f54\u3067\u5b9f\u52d9\u306b\u4f7f\u3048\u308b\u89e3\u8aac\u3092\u65e5\u672c\u8a9e\u3067\u4f5c\u6210\u3057\u3066\u304f\u3060\u3055\u3044\u3002
-
-## \u3053\u306e\u5206\u6790\u3067\u91cd\u8996\u3059\u308b\u8996\u70b9
-- {focus_config['focus']}
-- {focus_config['priority']}
-- {focus_config['actions']}
-{constraint_line}
-
-## \u57fa\u672c\u60c5\u5831
-- \u5206\u6790\u540d: {analysis_name}
-- \u30b1\u30fc\u30b9\u6570: {int(ai_context['dashboard_summary'].get('total_cases', 0)):,}
-- \u30a4\u30d9\u30f3\u30c8\u6570: {int(ai_context['dashboard_summary'].get('total_records', 0)):,}
-- \u5206\u6790\u671f\u9593: {ai_context['period_text']}
-- \u5e73\u5747\u30b1\u30fc\u30b9\u51e6\u7406\u6642\u9593: {ai_context['dashboard_summary'].get('avg_case_duration_text', '0s')}
-- \u4e0a\u4f4d10\u30d0\u30ea\u30a2\u30f3\u30c8\u30ab\u30d0\u30fc\u7387: {float(ai_context['dashboard_summary'].get('top10_variant_coverage_pct', 0.0)):.2f}%
-
-## \u73fe\u5728\u306e\u5206\u6790\u7d50\u679c\u4e0a\u4f4d
-{serialize_ai_prompt_rows(ai_context['analysis_rows'], max_items=7)}
-
-## \u30a2\u30af\u30c6\u30a3\u30d3\u30c6\u30a3\u30dc\u30c8\u30eb\u30cd\u30c3\u30af
-{serialize_ai_prompt_rows(ai_context['bottleneck_summary'].get('activity_bottlenecks', []), max_items=5)}
-
-## \u9077\u79fb\u30dc\u30c8\u30eb\u30cd\u30c3\u30af
-{serialize_ai_prompt_rows(ai_context['bottleneck_summary'].get('transition_bottlenecks', []), max_items=5)}
-
-## \u6539\u5584\u30a4\u30f3\u30d1\u30af\u30c8\u4e0a\u4f4d
-{serialize_ai_prompt_rows(ai_context['impact_summary'].get('rows', []), max_items=5)}
-
-## Root Cause \u5019\u88dc
-{serialize_ai_prompt_rows(ai_context['root_cause_summary'].get('rows', []), max_items=5)}
-
-## \u4e3b\u8981\u30d0\u30ea\u30a2\u30f3\u30c8
-{serialize_ai_prompt_rows(ai_context['variant_items'], max_items=5)}
-
-## \u30eb\u30fc\u30eb\u30d9\u30fc\u30b9\u8981\u70b9
-{serialize_ai_prompt_rows([item.get('text', '') for item in ai_context['insights_summary'].get('items', [])], max_items=5)}{group_prompt_section}
-
-## \u56de\u7b54\u5f62\u5f0f\uff08\u5fc5\u305a\u4ee5\u4e0b\u306e4\u30bb\u30af\u30b7\u30e7\u30f3\u306b\u5206\u3051\u3066\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\uff09
-【\u5168\u4f53\u50be\u5411】
-\u5168\u4f53\u306e\u50be\u5411\u30922\u301c3\u6587\u3067\u8981\u7d04\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u6570\u5024\u3092\u305d\u306e\u307e\u307e\u4e26\u3079\u308b\u306e\u3067\u306f\u306a\u304f\u3001\u610f\u5473\u306e\u3042\u308b\u89e3\u91c8\u3092\u542b\u3081\u3066\u304f\u3060\u3055\u3044\u3002
-
-【\u6ce8\u76ee\u30dd\u30a4\u30f3\u30c8】
-\u3053\u306e\u5206\u6790\u3067\u7279\u306b\u6ce8\u76ee\u3059\u3079\u304d\u30dd\u30a4\u30f3\u30c8\u30922\u301c3\u70b9\u3001\u7b87\u6761\u66f8\u304d\u3067\u6574\u7406\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u5358\u306a\u308b\u6570\u5024\u306e\u5217\u6319\u3067\u306f\u306a\u304f\u3001\u306a\u305c\u91cd\u8981\u304b\u3082\u7c21\u6f54\u306b\u8ff0\u3079\u3066\u304f\u3060\u3055\u3044\u3002
-
-【\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u793a\u5506】
-\u30dc\u30c8\u30eb\u30cd\u30c3\u30af\u5019\u88dc\u30921\u301c2\u70b9\u306b\u7d5e\u3063\u3066\u8aac\u660e\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u5206\u6790\u7d50\u679c\u306b\u57fa\u3065\u304f\u6839\u62e0\u3092\u660e\u793a\u3057\u3001\u78ba\u8a8d\u3059\u3079\u304d\u8981\u56e0\u3092\u793a\u3057\u3066\u304f\u3060\u3055\u3044\u3002
-
-{group_instruction}【\u63a8\u5968\u30a2\u30af\u30b7\u30e7\u30f3】
-\u5206\u6790\u7d50\u679c\u3092\u8e0f\u307e\u3048\u3001\u6b21\u306b\u78ba\u8a8d\u3059\u3079\u304d\u30a2\u30af\u30b7\u30e7\u30f3\u3084\u8ffd\u52a0\u8abf\u67fb\u30921\u301c3\u70b9\u3001\u7b87\u6761\u66f8\u304d\u3067\u63d0\u6848\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u5b9f\u884c\u53ef\u80fd\u3067\u5177\u4f53\u7684\u306a\u5185\u5bb9\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002
-
-マークダウン記法（**、##、- 、▸ のリスト記号など）は使わず、プレーンテキストで出力してください。
-ただしセクション見出しは必ず【】で囲んでください（例: 【全体傾向】【注目ポイント】【ボトルネック示唆】【推奨アクション】）。
-強調したい箇所は「」で囲んでください。箇条書きには「・」を使用してください。
-処理時間を日数で表す場合は「X日Y時間」形式ではなく「X.X日」形式で記載してください。
-"""
-
-def extract_recommended_actions_from_text(text):
-    """LLMの出力テキストから推奨アクションセクションを分離して返す。"""
-    normalized_text = str(text or "").strip()
-    if not normalized_text:
-        return "", []
-
-    lines = normalized_text.splitlines()
-    # 【推奨アクション】完全一致を優先、なければ「推奨アクション」を含む短い行にフォールバック
-    marker_index = next(
-        (index for index, line in enumerate(lines) if line.strip() == "【推奨アクション】"),
-        None,
-    )
-    if marker_index is None:
-        marker_index = next(
-            (index for index, line in enumerate(lines)
-             if "推奨アクション" in line.strip() and len(line.strip()) <= 20),
-            None,
-        )
-    if marker_index is None:
-        return normalized_text, []
-
-    main_text = "\n".join(lines[:marker_index]).rstrip()
-    actions = []
-    for line in lines[marker_index + 1 :]:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped[0] in "-・●":
-            actions.append(stripped.lstrip("-・● ").strip())
-        elif len(stripped) > 1 and stripped[0].isdigit() and stripped[1] in ".)":
-            actions.append(stripped[2:].strip())
-        elif len(stripped) > 2 and stripped[:2].isdigit() and stripped[2] in ".)":
-            actions.append(stripped[3:].strip())
-        else:
-            actions.append(stripped)
-
-    return main_text, [action for action in actions if action]
-
 def build_ai_recommended_actions(ai_context):
     """ルールベースで推奨アクションのリストを生成して返す。"""
     analysis_key = str(ai_context["analysis_key"]).strip().lower()
@@ -578,24 +425,6 @@ def build_ai_fallback_text(ai_context):
         ]
     )
 
-def build_empty_ai_summary(analysis_key, analysis_name):
-    return {
-        "title": REPORT_SHEET_NAMES["ai_insights"],
-        "analysis_key": analysis_key,
-        "analysis_name": analysis_name,
-        "generated": False,
-        "cached": False,
-        "mode": "idle",
-        "provider": "",
-        "generated_at": "",
-        "period": "",
-        "text": "",
-        "highlights": [],
-        "recommended_actions": [],
-        "note": "まだ生成していません。現在の分析条件に対する分析コメントを生成すると、画面を切り替えても保持されます。",
-    }
-
-
 def get_cached_ai_summary(run_data, analysis_key, filter_params=None):
     cache_key = (
         str(analysis_key or "").strip().lower(),
@@ -605,11 +434,14 @@ def get_cached_ai_summary(run_data, analysis_key, filter_params=None):
     cached_payload = run_data.setdefault("ai_insights_cache", {}).get(cache_key)
     if cached_payload is None:
         return None
-    return {
+    cached = {
         **cached_payload,
         "generated": True,
         "cached": True,
     }
+    if cached.get("text"):
+        cached["text"] = normalize_ai_generated_text(cached["text"])
+    return cached
 
 
 def build_ai_context_summary(
@@ -729,149 +561,6 @@ def build_ai_context_summary(
         "insights_summary": resolved_insights_summary,
         "group_columns": group_columns or [],
         "group_summary": group_summary or [],
-    }
-
-
-def build_ai_insights_summary(
-    run_data,
-    analysis_key,
-    filter_params=None,
-    prepared_df=None,
-    variant_pattern=None,
-    analysis=None,
-    dashboard_summary=None,
-    impact_summary=None,
-    bottleneck_summary=None,
-    root_cause_summary=None,
-    insights_summary=None,
-    variant_items=None,
-    analysis_name=None,
-    force_refresh=False,
-    use_cache=True,
-    generate_text=None,
-    group_columns=None,
-    group_summary=None,
-):
-    cache_key = (
-        str(analysis_key or "").strip().lower(),
-        build_filter_cache_key(filter_params),
-        str(variant_pattern or "").strip() or None,
-    )
-    cache = run_data.setdefault("ai_insights_cache", {})
-
-    if use_cache and not force_refresh and cache_key in cache:
-        return {
-            **cache[cache_key],
-            "generated": True,
-            "cached": True,
-        }
-
-    ai_context = build_ai_context_summary(
-        run_data=run_data,
-        analysis_key=analysis_key,
-        filter_params=filter_params,
-        prepared_df=prepared_df,
-        variant_pattern=variant_pattern,
-        analysis=analysis,
-        dashboard_summary=dashboard_summary,
-        impact_summary=impact_summary,
-        bottleneck_summary=bottleneck_summary,
-        root_cause_summary=root_cause_summary,
-        insights_summary=insights_summary,
-        variant_items=variant_items,
-        analysis_name=analysis_name,
-        group_columns=group_columns,
-        group_summary=group_summary,
-    )
-    generated_at = datetime.now(timezone.utc).isoformat()
-    fallback_text = build_ai_fallback_text(ai_context)
-
-    if not ai_context["dashboard_summary"].get("has_data"):
-        fallback_actions = build_ai_recommended_actions(ai_context)
-        payload = {
-            "title": REPORT_SHEET_NAMES["ai_insights"],
-            "analysis_key": ai_context["analysis_key"],
-            "analysis_name": ai_context["analysis_name"],
-            "mode": "rule_based",
-            "provider": "",
-            "generated_at": generated_at,
-            "period": ai_context["period_text"],
-            "text": fallback_text,
-            "highlights": [
-                item["text"] for item in ai_context["insights_summary"].get("items", [])
-            ],
-            "recommended_actions": fallback_actions,
-            "note": "対象データがないため、既存集計からの要約のみを表示しています。",
-        }
-        if use_cache:
-            cache[cache_key] = payload
-        return {
-            **payload,
-            "generated": True,
-            "cached": False,
-        }
-
-    request_ai_text = generate_text or request_ollama_insights_text
-
-    try:
-        ai_text = request_ai_text(build_analysis_ai_prompt(ai_context))
-        if ai_text:
-            main_text, llm_actions = extract_recommended_actions_from_text(ai_text)
-            # LLMが推奨アクションを生成できなかった場合はルールベースで補完
-            if not llm_actions:
-                llm_actions = build_ai_recommended_actions(ai_context)
-            payload = {
-                "title": REPORT_SHEET_NAMES["ai_insights"],
-                "analysis_key": ai_context["analysis_key"],
-                "analysis_name": ai_context["analysis_name"],
-                "mode": "ollama",
-                "provider": "",
-                "generated_at": generated_at,
-                "period": ai_context["period_text"],
-                "text": main_text,
-                "highlights": [
-                    item["text"]
-                    for item in ai_context["insights_summary"].get("items", [])
-                ],
-                "recommended_actions": llm_actions,
-                "note": "",
-            }
-            if use_cache:
-                cache[cache_key] = payload
-            return {
-                **payload,
-                "generated": True,
-                "cached": False,
-            }
-    except httpx.ConnectError:
-        error_message = "既存集計からの要約を掲載しています。"
-    except Exception as exc:
-        error_message = (
-            "既存集計からの要約を掲載しています。"
-        )
-    else:
-        error_message = "既存集計からの要約を掲載しています。"
-
-    fallback_actions = build_ai_recommended_actions(ai_context)
-    payload = {
-        "title": REPORT_SHEET_NAMES["ai_insights"],
-        "analysis_key": ai_context["analysis_key"],
-        "analysis_name": ai_context["analysis_name"],
-        "mode": "rule_based",
-        "provider": "",
-        "generated_at": generated_at,
-        "period": ai_context["period_text"],
-        "text": fallback_text,
-        "highlights": [item["text"] for item in ai_context["insights_summary"].get("items", [])],
-        "recommended_actions": fallback_actions,
-        "note": error_message,
-    }
-    if use_cache:
-        cache[cache_key] = payload
-    return {
-        **payload,
-        "generated": True,
-        "cached": False,
     }
 
 
@@ -1142,11 +831,10 @@ def build_ai_insights_summary(
     cache = run_data.setdefault("ai_insights_cache", {})
 
     if use_cache and not force_refresh and cache_key in cache:
-        return {
-            **cache[cache_key],
-            "generated": True,
-            "cached": True,
-        }
+        cached = {**cache[cache_key], "generated": True, "cached": True}
+        if cached.get("text"):
+            cached["text"] = normalize_ai_generated_text(cached["text"])
+        return cached
 
     ai_context = build_ai_context_summary(
         run_data=run_data,
