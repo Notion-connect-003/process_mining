@@ -1,1 +1,1 @@
-﻿from web_reports.detail_report_pattern_sheets import *
+from reports.excel.exports.detail_report_pattern_sheets import *

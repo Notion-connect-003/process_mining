@@ -1,1 +1,1 @@
-﻿from web_reports.log_diagnostic_report import *
+from reports.excel.exports.log_diagnostic_report import *

@@ -1,1 +1,1 @@
-﻿from web_reports.detail_report_main import *
+from reports.excel.exports.detail_report_main import *
