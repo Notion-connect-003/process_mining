@@ -3,7 +3,8 @@ import pandas as pd
 
 from fastapi import HTTPException
 
-from web_reports.detail_report import format_duration_text_for_report
+from excel.detail.report import format_duration_text_for_report
+from web_services.cache_keys import build_filter_cache_key as build_filter_cache_key_impl
 
 from 共通スクリプト.analysis_service import (
     FLOW_PATTERN_CASE_COUNT_COLUMN,
@@ -23,8 +24,6 @@ from 共通スクリプト.duckdb_service import (
     query_transition_records_for_patterns,
     query_variant_summary,
 )
-
-from web_config.app_settings import FILTER_PARAM_NAMES
 
 PROCESS_FLOW_PATTERN_CAP = 300
 MAX_PATTERN_FLOW_CACHE = 24
@@ -49,11 +48,7 @@ def get_run_variant_pattern(run_data, variant_id=None, pattern_index=None, filte
     return None
 
 def build_filter_cache_key(filter_params):
-    normalized_filters = normalize_filter_params(**(filter_params or {}))
-    return tuple(
-        normalized_filters.get(filter_name)
-        for filter_name in FILTER_PARAM_NAMES
-    )
+    return build_filter_cache_key_impl(filter_params)
 
 def get_filtered_meta_for_run(run_data, filter_params=None, variant_pattern=None):
     return query_filtered_meta(
@@ -581,3 +576,6 @@ def get_pattern_flow_snapshot(
         cache.popitem(last=False)
 
     return snapshot
+
+
+

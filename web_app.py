@@ -1,4 +1,4 @@
-import inspect
+﻿import inspect
 import json
 from pathlib import Path
 
@@ -20,12 +20,12 @@ from web_config.app_settings import (
     RUN_STORAGE_DIR,
     SAMPLE_FILE,
 )
-from web_reports.excel_common import (
+from excel.common import (
     build_analysis_excel_file_name,
     resolve_analysis_display_name,
 )
 
-from web_reports.detail_report import build_detail_export_workbook_bytes
+from excel.detail.report import build_detail_export_workbook_bytes
 from web_services.ai_helpers import (
     build_ai_insights_summary,
     build_empty_ai_summary,
@@ -75,13 +75,13 @@ from web_services.run_helpers import (
     get_run_data,
     has_parquet_backing,
 )
-from web_reports.log_diagnostic_report import (
+from excel.log_diagnostic import (
     build_log_diagnostic_workbook_bytes,
     resolve_log_diagnostic_sample_row_limit,
 )
 
+from web_services.cache_keys import build_filter_cache_key
 from web_services.analysis_queries import (
-    build_filter_cache_key,
     build_pattern_index_entries_from_rows,
     build_variant_response_item,
     extract_pattern_text_from_row,
@@ -99,7 +99,7 @@ from web_services.analysis_queries import (
     get_variant_items,
 )
 
-from 共通スクリプト.Excel出力.excel_exporter import (
+from excel.basic_exporter import (
     build_excel_bytes,
     build_summary_sheet_df,
     convert_analysis_result_to_records,
@@ -294,3 +294,7 @@ register_ingest_routes(
 
 if __name__ == "__main__":
     uvicorn.run("web_app:app", host="127.0.0.1", port=5000, reload=False)
+
+
+
+

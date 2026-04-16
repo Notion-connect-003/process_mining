@@ -1,4 +1,4 @@
-from web_reports.excel_common import (
+﻿from web_reports.excel_common import (
     REPORT_HEADER_LABELS,
     normalize_excel_cell_value,
 )

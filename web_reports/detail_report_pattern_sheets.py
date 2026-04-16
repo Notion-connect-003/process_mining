@@ -1,4 +1,4 @@
-from web_reports.excel_common import (
+﻿from web_reports.excel_common import (
     REPORT_SHEET_NAMES,
     append_bullet_rows,
     append_key_value_rows,

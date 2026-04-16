@@ -975,3 +975,4 @@ def append_structured_text_block_to_worksheet(
 
     return current_row + 1
 
+from excel.common import *
