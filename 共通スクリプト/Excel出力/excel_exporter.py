@@ -118,7 +118,7 @@ def insert_group_section_rows(worksheet, df, group_columns):
         excel_row = df_idx + 2
         worksheet.insert_rows(excel_row)
         section_cell = worksheet.cell(row=excel_row, column=1)
-        section_cell.value = f"▸ {group_value}"
+        section_cell.value = f"■ {group_value}"
         section_cell.font = GROUP_SECTION_FONT
         section_cell.fill = GROUP_SECTION_FILL
         if worksheet.max_column > 1:

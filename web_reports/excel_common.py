@@ -943,7 +943,7 @@ def append_structured_text_block_to_worksheet(
         # 小見出し行（太字、背景なし）
         merge_excel_row(worksheet, current_row, safe_column_count)
         subtitle_cell = worksheet.cell(
-            row=current_row, column=1, value=f"▸ {subsection_title}"
+            row=current_row, column=1, value=f"【{subsection_title}】"
         )
         style_excel_cell(
             subtitle_cell,
