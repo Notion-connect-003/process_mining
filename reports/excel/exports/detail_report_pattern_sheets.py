@@ -1,4 +1,4 @@
-﻿from web_reports.excel_common import (
+﻿from reports.excel.common import (
     REPORT_SHEET_NAMES,
     append_bullet_rows,
     append_key_value_rows,
@@ -6,7 +6,7 @@
     initialize_excel_worksheet,
     sanitize_workbook_sheet_name,
 )
-from web_reports.detail_report_helpers import *
+from reports.excel.exports.detail_report_helpers import *
 def _create_report_sheet(workbook, title, *, use_active=False):
     worksheet = workbook.active if use_active else workbook.create_sheet()
     worksheet.title = sanitize_workbook_sheet_name(title)
@@ -14,7 +14,7 @@ def _create_report_sheet(workbook, title, *, use_active=False):
     return worksheet
 
 def _append_pattern_export_sheets(workbook, context, run_data, filter_params, pattern_display_limit="10"):
-    from web_reports.detail_report_sections import (
+    from reports.excel.exports.detail_report_sections import (
         append_pattern_conclusion_charts,
         append_pattern_detail_sheet,
         build_excel_anchor,

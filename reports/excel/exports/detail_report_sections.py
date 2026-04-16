@@ -6,7 +6,7 @@ from openpyxl.chart.label import DataLabelList
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 
-from web_reports.excel_common import (
+from reports.excel.common import (
     EXCEL_ALT_ROW_FILL,
     EXCEL_BODY_FONT,
     EXCEL_BOLD_FONT,
@@ -26,14 +26,14 @@ from web_reports.excel_common import (
     style_excel_cell,
 )
 
-from web_reports.detail_report_helpers import *
-from web_reports.detail_report_helpers import (
+from reports.excel.exports.detail_report_helpers import *
+from reports.excel.exports.detail_report_helpers import (
     _build_scoped_relation_cte,
     _format_stddev_column,
     _get_parquet_column_names,
     _quote_identifier,
 )
-from web_reports.detail_report_pattern_sheets import _append_pattern_export_sheets
+from reports.excel.exports.detail_report_pattern_sheets import _append_pattern_export_sheets
 
 
 def _write_section_header(worksheet, row_index, title, column_count=10):

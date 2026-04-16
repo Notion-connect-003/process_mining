@@ -1,9 +1,9 @@
-﻿from web_reports.excel_common import (
+﻿from reports.excel.common import (
     REPORT_HEADER_LABELS,
     normalize_excel_cell_value,
 )
 
-from 共通スクリプト.Excel出力.excel_exporter import (
+from reports.excel.exports.excel_exporter import (
     build_excel_bytes,
     build_summary_sheet_df,
     convert_analysis_result_to_records,

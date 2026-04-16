@@ -9,7 +9,7 @@ from openpyxl.chart.label import DataLabelList
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 
-from web_reports.excel_common import (
+from reports.excel.common import (
     ANALYSIS_PRECONDITIONS_TEXT,
     APPLIED_FILTERS_NOTE_TEXT,
     EXCEL_ASSUMPTION_SECTION_FILL,
@@ -31,9 +31,9 @@ from web_reports.excel_common import (
     sanitize_workbook_sheet_name,
 )
 
-from web_reports.detail_report_helpers import *
-from web_reports.detail_report_sections import *
-from web_reports.detail_report_sections import (
+from reports.excel.exports.detail_report_helpers import *
+from reports.excel.exports.detail_report_sections import *
+from reports.excel.exports.detail_report_sections import (
     _append_pattern_export_sheets,
     _iter_groups_from_parquet,
     _write_frequency_data,

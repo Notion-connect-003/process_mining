@@ -2,7 +2,7 @@
 
 from openpyxl import Workbook
 
-from web_reports.excel_common import (
+from reports.excel.common import (
     LOG_DIAGNOSTIC_SHEET_NAMES,
     append_key_value_rows,
     append_table_to_worksheet,
