@@ -25,7 +25,7 @@ from reports.excel.common import (
     resolve_analysis_display_name,
 )
 
-from reports.excel.exports.detail_report_main import build_detail_export_workbook_bytes
+from excel.detail.main import build_detail_export_workbook_bytes
 from web_services.ai_helpers import (
     build_ai_insights_summary,
     build_empty_ai_summary,
@@ -75,7 +75,7 @@ from web_services.run_helpers import (
     get_run_data,
     has_parquet_backing,
 )
-from reports.excel.exports.log_diagnostic_report import (
+from excel.log_diagnostic import (
     build_log_diagnostic_workbook_bytes,
     resolve_log_diagnostic_sample_row_limit,
 )
@@ -99,7 +99,7 @@ from web_services.analysis_queries import (
     get_variant_items,
 )
 
-from reports.excel.exports.excel_exporter import (
+from excel.basic_exporter import (
     build_excel_bytes,
     build_summary_sheet_df,
     convert_analysis_result_to_records,
