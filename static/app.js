@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Top page entrypoint.
  * Depends on: static/top/state.js, profile.js, diagnostics.js, form.js
  * Exposes: none
