@@ -86,24 +86,10 @@ let currentProfilePayload = mergeProfilePayload(
 );
 let currentDashboardSupplement = loadDashboardSupplement();
 
-function setStatus(message, type = "info") {
-    statusPanel.textContent = message;
-    statusPanel.className = `status-panel ${type}`;
-}
-
-function hideStatus() {
-    statusPanel.className = "status-panel hidden";
-    statusPanel.textContent = "";
-}
-
-function escapeHtml(value) {
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
+const sharedUi = window.ProcessMiningShared;
+const { escapeHtml, getDownloadFileName, readMultiSelectValues } = sharedUi;
+const setStatus = (message, type = "info") => sharedUi.setStatus(statusPanel, message, type);
+const hideStatus = () => sharedUi.hideStatus(statusPanel);
 
 function formatNumber(value) {
     const numericValue = Number(value);
@@ -948,12 +934,6 @@ function replaceMultiSelectOptions(selectElement, options, selectedValues = []) 
     });
 }
 
-function readMultiSelectValues(selectElement) {
-    return Array.from(selectElement?.selectedOptions || [])
-        .map((optionElement) => String(optionElement.value || "").trim())
-        .filter(Boolean);
-}
-
 function getCurrentActivityEndpointFilterState() {
     return {
         start_activity_values: readMultiSelectValues(startActivityValuesSelect),
@@ -1460,21 +1440,6 @@ function validateAnalyzeForm() {
     }
 
     return "";
-}
-
-function getDownloadFileName(response, fallbackFileName) {
-    const disposition = response.headers.get("Content-Disposition") || "";
-    const utf8FileNameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-    if (utf8FileNameMatch) {
-        return decodeURIComponent(utf8FileNameMatch[1]);
-    }
-
-    const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
-    if (fileNameMatch) {
-        return fileNameMatch[1];
-    }
-
-    return fallbackFileName;
 }
 
 async function downloadBulkExcelArchive(runId, buttonElement) {
