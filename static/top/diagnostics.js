@@ -303,18 +303,3 @@ async function runLogDiagnostics() {
     }
 }
 
-function validateColumnSelections() {
-    const caseIdColumn = String(caseIdColumnSelect?.value || "").trim();
-    const activityColumn = String(activityColumnSelect?.value || "").trim();
-    const timestampColumn = String(timestampColumnSelect?.value || "").trim();
-
-    if (!caseIdColumn || !activityColumn || !timestampColumn) {
-        return "ケースID列 / アクティビティ列 / タイムスタンプ列を選択してください。";
-    }
-
-    if (new Set([caseIdColumn, activityColumn, timestampColumn]).size !== 3) {
-        return "ケースID列 / アクティビティ列 / タイムスタンプ列にはそれぞれ異なる列を選択してください。";
-    }
-
-    return "";
-}

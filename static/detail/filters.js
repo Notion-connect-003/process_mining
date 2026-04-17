@@ -75,7 +75,17 @@ let frequencyChartLimit = 10;
 let transitionChartLimit = 15;
 
 const sharedUi = window.ProcessMiningShared;
-const { buildTransitionKey, escapeHtml, fetchJson, formatDateTime, formatDurationSeconds, getRunId, loadLatestResult } = sharedUi;
+const {
+    buildTransitionKey,
+    escapeHtml,
+    fetchJson,
+    formatDateTime,
+    formatDurationSeconds,
+    getDownloadFileName,
+    getRunId,
+    loadLatestResult,
+    readMultiSelectValues,
+} = sharedUi;
 const DETAIL_HEAVY_FETCH_TIMEOUT_MS = 120000;
 const DETAIL_LIGHTWEIGHT_LOAD_OPTIONS = Object.freeze({
     includeDashboard: false,
@@ -464,21 +474,6 @@ function loadCaseTrace(runId, caseId) {
     );
 }
 
-function getDownloadFileName(response, fallbackFileName) {
-    const disposition = response.headers.get("Content-Disposition") || "";
-    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-    if (utf8Match?.[1]) {
-        try {
-            return decodeURIComponent(utf8Match[1]);
-        } catch {
-            return utf8Match[1];
-        }
-    }
-
-    const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
-    return asciiMatch?.[1] || fallbackFileName;
-}
-
 function buildDetailExcelExportUrl(runId, options = {}) {
     const {
         analysisKeyName = analysisKey,
@@ -599,12 +594,6 @@ function replaceMultiSelectOptions(selectElement, options, selectedValues = []) 
     Array.from(selectElement.options).forEach((optionElement) => {
         optionElement.selected = normalizedSelectedValues.includes(optionElement.value);
     });
-}
-
-function readMultiSelectValues(selectElement) {
-    return Array.from(selectElement?.selectedOptions || [])
-        .map((optionElement) => String(optionElement.value || "").trim())
-        .filter(Boolean);
 }
 
 function buildActivityFilterOptions(variantItems = [], selectedValues = []) {

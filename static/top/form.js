@@ -70,21 +70,6 @@ function validateAnalyzeForm() {
     return "";
 }
 
-function getDownloadFileName(response, fallbackFileName) {
-    const disposition = response.headers.get("Content-Disposition") || "";
-    const utf8FileNameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-    if (utf8FileNameMatch) {
-        return decodeURIComponent(utf8FileNameMatch[1]);
-    }
-
-    const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
-    if (fileNameMatch) {
-        return fileNameMatch[1];
-    }
-
-    return fallbackFileName;
-}
-
 async function downloadBulkExcelArchive(runId, buttonElement) {
     if (!runId) {
         return;
@@ -113,7 +98,7 @@ async function downloadBulkExcelArchive(runId, buttonElement) {
         const downloadUrl = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = downloadUrl;
-        anchor.download = getDownloadFileName(response, "全分析レポート.zip");
+        anchor.download = sharedUi.getDownloadFileName(response, "全分析レポート.zip");
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);

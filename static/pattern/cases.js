@@ -245,3 +245,5 @@ async function renderPatternDetailPage() {
         setStatus(error.message, "error");
     }
 }
+
+window.ProcessMiningPattern.renderPatternDetailPage = renderPatternDetailPage;

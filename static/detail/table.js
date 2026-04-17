@@ -1611,3 +1611,5 @@ async function renderDetailPage() {
         setStatus(error.message, "error");
     }
 }
+
+window.ProcessMiningDetail.renderDetailPage = renderDetailPage;

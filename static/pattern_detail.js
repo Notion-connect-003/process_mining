@@ -5,4 +5,4 @@
  */
 window.ProcessMiningPattern = window.ProcessMiningPattern || {};
 
-renderPatternDetailPage();
+window.ProcessMiningPattern.renderPatternDetailPage();

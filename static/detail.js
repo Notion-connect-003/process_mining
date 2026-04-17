@@ -5,4 +5,4 @@
  */
 window.ProcessMiningDetail = window.ProcessMiningDetail || {};
 
-void renderDetailPage();
+void window.ProcessMiningDetail.renderDetailPage();

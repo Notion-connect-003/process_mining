@@ -128,17 +128,6 @@ function renderInsightPanel(supplement, state = "ready") {
     `;
 }
 
-function getCurrentMappingState() {
-    return {
-        case_id_column: String(caseIdColumnSelect?.value || "").trim(),
-        activity_column: String(activityColumnSelect?.value || "").trim(),
-        timestamp_column: String(timestampColumnSelect?.value || "").trim(),
-        filter_column_1: String(filterColumnRefs[0]?.columnSelect?.value || "").trim(),
-        filter_column_2: String(filterColumnRefs[1]?.columnSelect?.value || "").trim(),
-        filter_column_3: String(filterColumnRefs[2]?.columnSelect?.value || "").trim(),
-    };
-}
-
 function getCurrentFilterValueState() {
     return Object.fromEntries(
         filterColumnRefs.map((filterRef) => [
@@ -235,16 +224,10 @@ function replaceMultiSelectOptions(selectElement, options, selectedValues = []) 
     });
 }
 
-function readMultiSelectValues(selectElement) {
-    return Array.from(selectElement?.selectedOptions || [])
-        .map((optionElement) => String(optionElement.value || "").trim())
-        .filter(Boolean);
-}
-
 function getCurrentActivityEndpointFilterState() {
     return {
-        start_activity_values: readMultiSelectValues(startActivityValuesSelect),
-        end_activity_values: readMultiSelectValues(endActivityValuesSelect),
+        start_activity_values: sharedUi.readMultiSelectValues(startActivityValuesSelect),
+        end_activity_values: sharedUi.readMultiSelectValues(endActivityValuesSelect),
     };
 }
 
