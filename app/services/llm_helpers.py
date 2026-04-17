@@ -1,7 +1,7 @@
 import json
 import httpx
 
-from web_config.llm_config import (
+from app.config.llm_config import (
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
     OLLAMA_THINK,

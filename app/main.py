@@ -8,7 +8,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from web_config.app_settings import (
+from app.config.app_settings import (
     BASE_DIR,
     COLUMN_CANDIDATES,
     COLUMN_DISPLAY_LABELS,
@@ -26,32 +26,32 @@ from excel import (
 )
 
 from excel.detail.main import build_detail_export_workbook_bytes
-from web_services.ai_helpers import (
+from app.services.ai_helpers import (
     build_ai_insights_summary,
     build_empty_ai_summary,
     build_excel_ai_summary,
     get_cached_ai_summary,
 )
-from web_services.llm_helpers import (
+from app.services.llm_helpers import (
     build_bottleneck_prompt,
     request_ollama_insights_text,
 )
-from web_services.analyze_pipeline import (
+from app.services.analyze_pipeline import (
     execute_analysis_pipeline,
     parse_analyze_form,
     prepare_analysis_input_data,
     resolve_analyze_file_source,
 )
-from web_routes.detail import register_detail_routes
-from web_routes.flow import register_flow_routes
-from web_routes.ingest import register_ingest_routes
-from web_services.detail_context import (
+from app.routes.detail import register_detail_routes
+from app.routes.flow import register_flow_routes
+from app.routes.ingest import register_ingest_routes
+from app.services.detail_context import (
     build_detail_export_context as build_detail_export_context_impl,
     collect_analysis_detail_sections as collect_analysis_detail_sections_impl,
     get_analysis_export_sheet_keys,
     parse_transition_selection,
 )
-from web_services.support_helpers import (
+from app.services.support_helpers import (
     build_analysis_payload as build_analysis_payload_impl,
     build_column_selection_payload as build_column_selection_payload_impl,
     build_log_profile_payload as build_log_profile_payload_impl,
@@ -66,7 +66,7 @@ from web_services.support_helpers import (
     suggest_column_name as suggest_column_name_impl,
     validate_selected_columns,
 )
-from web_services.run_helpers import (
+from app.services.run_helpers import (
     build_column_settings_payload,
     build_filter_summary_text,
     get_effective_filter_params,
@@ -80,8 +80,8 @@ from excel.log_diagnostic import (
     resolve_log_diagnostic_sample_row_limit,
 )
 
-from web_services.cache_keys import build_filter_cache_key
-from web_services.analysis_queries import (
+from app.services.cache_keys import build_filter_cache_key
+from app.services.analysis_queries import (
     build_pattern_index_entries_from_rows,
     build_variant_response_item,
     extract_pattern_text_from_row,
@@ -293,7 +293,7 @@ register_ingest_routes(
 
 
 if __name__ == "__main__":
-    uvicorn.run("web_app:app", host="127.0.0.1", port=5000, reload=False)
+    uvicorn.run("app.main:app", host="127.0.0.1", port=5000, reload=False)
 
 
 

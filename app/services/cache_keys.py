@@ -1,4 +1,4 @@
-from web_config.app_settings import FILTER_PARAM_NAMES
+from app.config.app_settings import FILTER_PARAM_NAMES
 
 
 def _normalize_filter_value(value):

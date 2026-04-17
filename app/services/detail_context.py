@@ -1,5 +1,5 @@
-from web_services.ai_helpers import build_excel_ai_summary
-from web_services.analysis_queries import (
+from app.services.ai_helpers import build_excel_ai_summary
+from app.services.analysis_queries import (
     get_analysis_data,
     get_bottleneck_summary,
     get_dashboard_summary,
@@ -11,7 +11,7 @@ from web_services.analysis_queries import (
     get_run_variant_pattern,
     get_variant_items,
 )
-from web_services.run_helpers import build_filter_summary_text
+from app.services.run_helpers import build_filter_summary_text
 
 from 共通スクリプト.analysis_service import get_available_analysis_definitions
 from 共通スクリプト.duckdb_service import (

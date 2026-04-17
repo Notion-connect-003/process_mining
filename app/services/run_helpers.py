@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException, Request
 
-from web_services.analysis_queries import build_pattern_index_entries_from_rows
+from app.services.analysis_queries import build_pattern_index_entries_from_rows
 
 from 共通スクリプト.analysis_service import (
     get_filter_options,
@@ -17,7 +17,7 @@ from 共通スクリプト.analysis_service import (
 from 共通スクリプト.duckdb_service import persist_prepared_parquet
 
 
-from web_config.app_settings import FILTER_PARAM_NAMES
+from app.config.app_settings import FILTER_PARAM_NAMES
 FILTER_COLUMN_NAMES = ("filter_column_1", "filter_column_2", "filter_column_3")
 FILTER_LABEL_NAMES = ("filter_label_1", "filter_label_2", "filter_label_3")
 

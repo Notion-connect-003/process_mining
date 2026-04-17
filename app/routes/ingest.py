@@ -6,7 +6,7 @@ import duckdb
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from web_services.llm_helpers import stream_ollama_response
+from app.services.llm_helpers import stream_ollama_response
 
 
 def register_ingest_routes(

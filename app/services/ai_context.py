@@ -3,7 +3,7 @@ import json
 import pandas as pd
 
 from excel.common import normalize_excel_cell_value
-from web_services.analysis_queries import (
+from app.services.analysis_queries import (
     get_analysis_data,
     get_bottleneck_summary,
     get_dashboard_summary,

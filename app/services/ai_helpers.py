@@ -5,7 +5,7 @@ import re
 import httpx
 import pandas as pd
 
-from web_services.analysis_queries import (
+from app.services.analysis_queries import (
     get_analysis_data,
     get_bottleneck_summary,
     get_dashboard_summary,
@@ -16,14 +16,14 @@ from web_services.analysis_queries import (
 )
 from excel.detail.report import build_transition_display_label
 from excel.common import REPORT_SHEET_NAMES, normalize_excel_cell_value
-from web_services.cache_keys import build_filter_cache_key
-from web_services.ai_actions import build_ai_recommended_actions as build_ai_recommended_actions_impl
-from web_services.ai_context import (
+from app.services.cache_keys import build_filter_cache_key
+from app.services.ai_actions import build_ai_recommended_actions as build_ai_recommended_actions_impl
+from app.services.ai_context import (
     build_ai_context_summary as build_ai_context_summary_impl,
     serialize_ai_prompt_rows as serialize_ai_prompt_rows_impl,
 )
-from web_services.ai_fallback import build_ai_fallback_text as build_ai_fallback_text_impl
-from web_services.llm_helpers import request_ollama_insights_text
+from app.services.ai_fallback import build_ai_fallback_text as build_ai_fallback_text_impl
+from app.services.llm_helpers import request_ollama_insights_text
 
 
 

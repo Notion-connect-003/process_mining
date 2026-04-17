@@ -1,7 +1,7 @@
 ﻿from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 PROFILE_SAMPLE_FILE = BASE_DIR / "sample_event_log.csv"
 SAMPLE_FILE = PROFILE_SAMPLE_FILE
 RUN_STORAGE_DIR = BASE_DIR / "storage" / "runs"

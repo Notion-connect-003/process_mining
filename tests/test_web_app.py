@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
-import web_app
+import app.main as app_main
 
 
 if "app" not in inspect.signature(httpx.Client.__init__).parameters:
@@ -25,7 +25,7 @@ if "app" not in inspect.signature(httpx.Client.__init__).parameters:
 class WebAppTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(web_app.app)
+        cls.client = TestClient(app_main.app)
 
     def visible_sheetnames(self, workbook):
         return [
@@ -256,7 +256,7 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual(200, analyze_response.status_code)
 
         run_id = analyze_response.json()["run_id"]
-        with mock.patch("web_app.filter_prepared_df", side_effect=AssertionError("filter_prepared_df should not run")):
+        with mock.patch("app.main.filter_prepared_df", side_effect=AssertionError("filter_prepared_df should not run")):
             detail_response = self.client.get(
                 f"/api/runs/{run_id}/analyses/frequency"
                 "?include_dashboard=false"
@@ -342,7 +342,7 @@ class WebAppTestCase(unittest.TestCase):
         )
 
         with mock.patch(
-            "web_app.build_excel_ai_summary",
+            "app.main.build_excel_ai_summary",
             return_value={
                 "title": "分析コメント",
                 "mode": "ollama",
@@ -633,8 +633,8 @@ class WebAppTestCase(unittest.TestCase):
         )
 
         with mock.patch(
-            "web_app.request_ollama_insights_text",
-            side_effect=web_app.httpx.ConnectError("offline"),
+            "app.main.request_ollama_insights_text",
+            side_effect=app_main.httpx.ConnectError("offline"),
         ):
             response = self.client.get(
                 f"/api/runs/{run_id}/report-excel?analysis_key=frequency"
@@ -765,8 +765,8 @@ class WebAppTestCase(unittest.TestCase):
         )
 
         with mock.patch(
-            "web_app.request_ollama_insights_text",
-            side_effect=web_app.httpx.ConnectError("offline"),
+            "app.main.request_ollama_insights_text",
+            side_effect=app_main.httpx.ConnectError("offline"),
         ):
             response = self.client.get(
                 f"/api/runs/{run_id}/report-excel?analysis_key=frequency"
@@ -802,7 +802,7 @@ class WebAppTestCase(unittest.TestCase):
         )
 
         with mock.patch(
-            "web_app.build_excel_ai_summary",
+            "app.main.build_excel_ai_summary",
             return_value={
                 "title": "分析コメント",
                 "mode": "ollama",
@@ -904,9 +904,9 @@ class WebAppTestCase(unittest.TestCase):
             },
         )
 
-        run_data = web_app.get_run_data(run_id)
+        run_data = app_main.get_run_data(run_id)
         expected = run_data["result"]["group_summary"]
-        actual = web_app.query_group_summary(
+        actual = app_main.query_group_summary(
             run_data["prepared_parquet_path"],
             ["group_a", "group_b"],
         )
@@ -938,7 +938,7 @@ class WebAppTestCase(unittest.TestCase):
         )
 
         with mock.patch(
-            "web_app.build_excel_ai_summary",
+            "app.main.build_excel_ai_summary",
             return_value={
                 "title": "分析コメント",
                 "mode": "ollama",
@@ -997,7 +997,7 @@ class WebAppTestCase(unittest.TestCase):
         )
 
         with mock.patch(
-            "web_app.build_excel_ai_summary",
+            "app.main.build_excel_ai_summary",
             return_value={
                 "title": "分析コメント",
                 "mode": "ollama",
@@ -1043,11 +1043,11 @@ class WebAppTestCase(unittest.TestCase):
             },
         )
 
-        run_data = web_app.get_run_data(run_id)
+        run_data = app_main.get_run_data(run_id)
         self.assertIsNone(run_data["prepared_df"])
 
         with mock.patch(
-            "web_app.build_excel_ai_summary",
+            "app.main.build_excel_ai_summary",
             return_value={
                 "title": "分析コメント",
                 "mode": "ollama",
@@ -1111,7 +1111,7 @@ class WebAppTestCase(unittest.TestCase):
         self.assertFalse(empty_response.json()["generated"])
 
         with mock.patch(
-            "web_app.request_ollama_insights_text",
+            "app.main.request_ollama_insights_text",
             return_value="頻度分析向けの分析コメントです。",
         ):
             generate_response = self.client.post(f"/api/runs/{run_id}/ai-insights/frequency")
@@ -1151,7 +1151,7 @@ class WebAppTestCase(unittest.TestCase):
                 return "pattern ai"
             return "generic ai"
 
-        with mock.patch("web_app.request_ollama_insights_text", side_effect=_fake_ai):
+        with mock.patch("app.main.request_ollama_insights_text", side_effect=_fake_ai):
             frequency_response = self.client.get(
                 f"/api/runs/{run_id}/report-excel?analysis_key=frequency"
             )
@@ -1186,7 +1186,7 @@ class WebAppTestCase(unittest.TestCase):
         )
 
         with mock.patch(
-            "web_app.request_ollama_insights_text",
+            "app.main.request_ollama_insights_text",
             return_value="pattern ai",
         ):
             response = self.client.get(
@@ -1223,7 +1223,7 @@ class WebAppTestCase(unittest.TestCase):
         )
 
         with mock.patch(
-            "web_app.request_ollama_insights_text",
+            "app.main.request_ollama_insights_text",
             return_value="pattern ai",
         ):
             response = self.client.get(
@@ -1268,8 +1268,8 @@ class WebAppTestCase(unittest.TestCase):
         )
 
         with mock.patch(
-            "web_app.create_pattern_flow_snapshot",
-            wraps=web_app.create_pattern_flow_snapshot,
+            "app.main.create_pattern_flow_snapshot",
+            wraps=app_main.create_pattern_flow_snapshot,
         ) as snapshot_mock:
             first_response = self.client.get(flow_path)
             second_response = self.client.get(flow_path)
@@ -1336,7 +1336,7 @@ class WebAppTestCase(unittest.TestCase):
             analysis_keys=["pattern"],
         )
 
-        with mock.patch("web_app.create_variant_summary", side_effect=AssertionError("create_variant_summary should not run")):
+        with mock.patch("app.main.create_variant_summary", side_effect=AssertionError("create_variant_summary should not run")):
             variant_response = self.client.get(f"/api/runs/{run_id}/variants?limit=0")
 
         self.assertEqual(200, variant_response.status_code)
@@ -1378,8 +1378,8 @@ class WebAppTestCase(unittest.TestCase):
             analysis_keys=["frequency", "pattern"],
         )
 
-        with mock.patch.object(web_app, "LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD", 1):
-            with mock.patch("web_app.create_pattern_flow_snapshot", wraps=web_app.create_pattern_flow_snapshot) as wrapped_snapshot:
+        with mock.patch.object(app_main, "LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD", 1):
+            with mock.patch("app.main.create_pattern_flow_snapshot", wraps=app_main.create_pattern_flow_snapshot) as wrapped_snapshot:
                 flow_response = self.client.get(f"/api/runs/{run_id}/pattern-flow")
 
         self.assertEqual(200, flow_response.status_code)
@@ -1509,9 +1509,9 @@ class WebAppTestCase(unittest.TestCase):
             analysis_keys=["frequency"],
         )
 
-        run_data = web_app.get_run_data(run_id)
-        self.assertTrue(web_app.has_parquet_backing(run_data))
-        self.assertTrue(web_app.Path(run_data["prepared_parquet_path"]).exists())
+        run_data = app_main.get_run_data(run_id)
+        self.assertTrue(app_main.has_parquet_backing(run_data))
+        self.assertTrue(app_main.Path(run_data["prepared_parquet_path"]).exists())
         self.assertTrue(
             str(run_data["prepared_parquet_path"]).endswith(f"{run_id}\\prepared.parquet")
         )
@@ -1522,8 +1522,8 @@ class WebAppTestCase(unittest.TestCase):
             analysis_keys=["frequency"],
         )
 
-        run_data = web_app.get_run_data(run_id)
-        self.assertTrue(web_app.Path(run_data["raw_csv_parquet_path"]).exists())
+        run_data = app_main.get_run_data(run_id)
+        self.assertTrue(app_main.Path(run_data["raw_csv_parquet_path"]).exists())
         self.assertTrue(
             str(run_data["raw_csv_parquet_path"]).endswith(f"{run_id}\\raw_upload.parquet")
         )
@@ -1639,12 +1639,12 @@ class WebAppTestCase(unittest.TestCase):
         self.assertTrue(all("avg_duration_text" in edge for edge in payload["flow_data"]["edges"]))
 
     def test_large_parquet_backed_run_can_release_prepared_df_and_still_render_pattern_flow(self):
-        with mock.patch.object(web_app, "LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD", 999999):
+        with mock.patch.object(app_main, "LARGE_DATASET_FLOW_FAST_PATH_THRESHOLD", 999999):
             run_id = self.analyze_uploaded_csv(
                 self.build_duckdb_validation_csv(),
                 analysis_keys=["frequency", "pattern"],
             )
-            run_data = web_app.get_run_data(run_id)
+            run_data = app_main.get_run_data(run_id)
             self.assertIsNone(run_data["prepared_df"])
 
             filter_options_response = self.client.get(f"/api/runs/{run_id}/filter-options")
@@ -1807,7 +1807,7 @@ class WebAppTestCase(unittest.TestCase):
         self.assertEqual(200, analyze_response.status_code)
 
         run_id = analyze_response.json()["run_id"]
-        run_data = web_app.get_run_data(run_id)
+        run_data = app_main.get_run_data(run_id)
         pattern_rows = run_data["result"]["analyses"]["pattern"]["rows"]
 
         if pattern_rows:
@@ -1850,7 +1850,7 @@ class WebAppTestCase(unittest.TestCase):
             analysis_keys=["pattern"],
         )
 
-        run_data = web_app.get_run_data(run_id)
+        run_data = app_main.get_run_data(run_id)
         self.assertIsNone(run_data["prepared_df"])
 
         detail_response = self.client.get(f"/api/runs/{run_id}/patterns/0")
@@ -1875,7 +1875,7 @@ class WebAppTestCase(unittest.TestCase):
             analysis_keys=["pattern"],
         )
 
-        run_data = web_app.get_run_data(run_id)
+        run_data = app_main.get_run_data(run_id)
         self.assertIsNone(run_data["prepared_df"])
 
         detail_response = self.client.get(f"/api/runs/{run_id}/patterns/0")

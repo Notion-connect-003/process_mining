@@ -4,7 +4,7 @@ import pandas as pd
 from fastapi import HTTPException
 
 from excel.detail.report import format_duration_text_for_report
-from web_services.cache_keys import build_filter_cache_key as build_filter_cache_key_impl
+from app.services.cache_keys import build_filter_cache_key as build_filter_cache_key_impl
 
 from 共通スクリプト.analysis_service import (
     FLOW_PATTERN_CASE_COUNT_COLUMN,
