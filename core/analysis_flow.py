@@ -1,7 +1,7 @@
-import math
+﻿import math
 from collections import defaultdict
 
-from 共通スクリプト.analysis_constants import (
+from core.analysis_constants import (
     FLOW_PATH_SEPARATOR,
     FLOW_PATTERN_CAP,
     FLOW_LAYOUT_SWEEP_ITERATIONS,
@@ -18,7 +18,7 @@ from 共通スクリプト.analysis_constants import (
     convert_analysis_result_to_records,
     create_transition_analysis,
 )
-from 共通スクリプト.analysis_core import (
+from core.analysis_core import (
     build_case_pattern_table,
     build_duration_interval_table,
     build_transition_key,
@@ -655,7 +655,7 @@ def analyze_event_log(
     output_root_dir=None,
     export_excel=False,
 ):
-    from 共通スクリプト.analysis_core import load_prepared_event_log, analyze_prepared_event_log
+    from core.analysis_core import load_prepared_event_log, analyze_prepared_event_log
     prepared_df = load_prepared_event_log(
         file_source=file_source,
         case_id_column=case_id_column,

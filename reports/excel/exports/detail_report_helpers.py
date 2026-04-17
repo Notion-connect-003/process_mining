@@ -9,7 +9,7 @@ from reports.excel.exports.excel_exporter import (
     convert_analysis_result_to_records,
 )
 
-from 共通スクリプト.analysis_service import (
+from core.analysis_service import (
     DEFAULT_ANALYSIS_KEYS,
     FLOW_PATTERN_CASE_COUNT_COLUMN,
     FLOW_PATTERN_COLUMN,
@@ -32,14 +32,14 @@ from 共通スクリプト.analysis_service import (
     select_pattern_rows_for_flow,
 )
 
-from 共通スクリプト.duckdb_core import (
+from core.duckdb_core import (
     _build_scoped_relation_cte,
     _format_stddev_column,
     _get_parquet_column_names,
     _quote_identifier,
     persist_prepared_parquet,
 )
-from 共通スクリプト.duckdb_analysis_queries import (
+from core.duckdb_analysis_queries import (
     query_analysis_records,
     query_case_trace_details,
     query_filter_options,
@@ -49,7 +49,7 @@ from 共通スクリプト.duckdb_analysis_queries import (
     query_transition_records_for_patterns,
     query_variant_summary,
 )
-from 共通スクリプト.duckdb_detail_queries import (
+from core.duckdb_detail_queries import (
     query_activity_case_drilldown,
     query_bottleneck_summary,
     query_dashboard_summary,

@@ -1,11 +1,11 @@
-from io import BytesIO
+﻿from io import BytesIO
 from pathlib import Path
 import unittest
 
 import pandas as pd
 from openpyxl import load_workbook
 
-from 共通スクリプト.analysis_service import (
+from core.analysis_service import (
     build_group_summary,
     create_activity_case_drilldown,
     create_case_trace_details,
@@ -21,11 +21,11 @@ from 共通スクリプト.analysis_service import (
     normalize_filter_column_settings,
     normalize_filter_params,
 )
-from 共通スクリプト.data_loader import load_and_prepare_data, prepare_event_log
-from 共通スクリプト.Excel出力.excel_exporter import _build_summary_sheet_df, build_excel_bytes
-from 共通スクリプト.分析.前後処理分析.transition_analysis import create_transition_analysis
-from 共通スクリプト.分析.処理順パターン分析.pattern_analysis import create_pattern_analysis
-from 共通スクリプト.分析.頻度分析.frequency_analysis import create_frequency_analysis
+from core.data_loader import load_and_prepare_data, prepare_event_log
+from excel.basic_exporter import _build_summary_sheet_df, build_excel_bytes
+from core.分析.前後処理分析.transition_analysis import create_transition_analysis
+from core.分析.処理順パターン分析.pattern_analysis import create_pattern_analysis
+from core.分析.頻度分析.frequency_analysis import create_frequency_analysis
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -247,7 +247,7 @@ class ProcessMiningTestCase(unittest.TestCase):
     def test_pattern_flow_snapshot_filters_top_patterns_nodes_and_edges(self):
         import importlib.util
 
-        module_path = ROOT_DIR / "共通スクリプト" / "analysis_service.py"
+        module_path = ROOT_DIR / "core" / "analysis_service.py"
         spec = importlib.util.spec_from_file_location("analysis_service_local", module_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

@@ -1,4 +1,4 @@
-from 共通スクリプト.分析.処理順パターン分析.pattern_analysis import (
+﻿from core.分析.処理順パターン分析.pattern_analysis import (
     ANALYSIS_CONFIG,
     create_pattern_analysis,
 )

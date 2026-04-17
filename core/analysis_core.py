@@ -1,4 +1,4 @@
-from 共通スクリプト.analysis_constants import (
+﻿from core.analysis_constants import (
     ANALYSIS_DEFINITIONS,
     DEFAULT_ANALYSIS_KEYS,
     FLOW_PATH_SEPARATOR,
@@ -64,7 +64,7 @@ def analyze_prepared_event_log(
     export_excel=False,
     group_columns=None,
 ):
-    from 共通スクリプト.analysis_filters import build_group_summary
+    from core.analysis_filters import build_group_summary
     analysis_keys = resolve_analysis_keys(selected_analysis_keys)
     analysis_results = {}
 

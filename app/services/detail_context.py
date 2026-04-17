@@ -1,4 +1,4 @@
-from app.services.ai_helpers import build_excel_ai_summary
+﻿from app.services.ai_helpers import build_excel_ai_summary
 from app.services.analysis_queries import (
     get_analysis_data,
     get_bottleneck_summary,
@@ -13,8 +13,8 @@ from app.services.analysis_queries import (
 )
 from app.services.run_helpers import build_filter_summary_text
 
-from 共通スクリプト.analysis_service import get_available_analysis_definitions
-from 共通スクリプト.duckdb_service import (
+from core.analysis_service import get_available_analysis_definitions
+from core.duckdb_service import (
     query_bottleneck_summary,
     query_group_summary,
     query_period_text,

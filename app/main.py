@@ -104,7 +104,7 @@ from excel.basic_exporter import (
     build_summary_sheet_df,
     convert_analysis_result_to_records,
 )
-from 共通スクリプト.analysis_service import (
+from core.analysis_service import (
     DEFAULT_ANALYSIS_KEYS,
     create_analysis_records,
     create_log_diagnostics,
@@ -119,7 +119,7 @@ from 共通スクリプト.analysis_service import (
     normalize_filter_params,
     normalize_filter_column_settings,
 )
-from 共通スクリプト.duckdb_service import (
+from core.duckdb_service import (
     persist_prepared_parquet,
     query_activity_case_drilldown,
     query_analysis_records,

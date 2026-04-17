@@ -1,6 +1,6 @@
-from pathlib import Path
+﻿from pathlib import Path
 
-from 共通スクリプト.analysis_service import analyze_event_log
+from core.analysis_service import analyze_event_log
 
 INPUT_FILE = Path("process_mining_sample_10000行.csv")
 OUTPUT_ROOT_DIR = Path("出力ファイル")

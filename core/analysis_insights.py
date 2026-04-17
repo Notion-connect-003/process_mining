@@ -1,6 +1,6 @@
-import pandas as pd
+﻿import pandas as pd
 
-from 共通スクリプト.analysis_constants import (
+from core.analysis_constants import (
     FILTER_SLOT_KEYS,
     DEFAULT_FILTER_LABELS,
     FLOW_PATH_SEPARATOR,
@@ -20,7 +20,7 @@ from 共通スクリプト.analysis_constants import (
     FLOW_PATTERN_AVG_CASE_DURATION_COLUMN,
     INSIGHT_ATTENTION_ACTIVITY_KEYWORDS,
 )
-from 共通スクリプト.analysis_core import (
+from core.analysis_core import (
     build_duration_interval_table,
     format_duration_text,
 )

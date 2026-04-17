@@ -1,11 +1,11 @@
-from app.services.run_helpers import (
+﻿from app.services.run_helpers import (
     get_form_filter_column_settings,
     get_form_filter_params,
     save_run_data,
     validate_filter_column_settings,
 )
 
-from 共通スクリプト.analysis_service import (
+from core.analysis_service import (
     analyze_prepared_event_log,
     build_group_summary,
     detect_group_columns,

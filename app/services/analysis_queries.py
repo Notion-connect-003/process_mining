@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from excel.detail.report import format_duration_text_for_report
 from app.services.cache_keys import build_filter_cache_key as build_filter_cache_key_impl
 
-from 共通スクリプト.analysis_service import (
+from core.analysis_service import (
     FLOW_PATTERN_CASE_COUNT_COLUMN,
     FLOW_PATTERN_COLUMN,
     create_pattern_flow_snapshot,
@@ -14,7 +14,7 @@ from 共通スクリプト.analysis_service import (
     normalize_filter_params,
     select_pattern_rows_for_flow,
 )
-from 共通スクリプト.duckdb_service import (
+from core.duckdb_service import (
     query_analysis_records,
     query_bottleneck_summary,
     query_dashboard_summary,
