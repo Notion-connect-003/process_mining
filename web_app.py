@@ -20,7 +20,7 @@ from web_config.app_settings import (
     RUN_STORAGE_DIR,
     SAMPLE_FILE,
 )
-from reports.excel.common import (
+from excel import (
     build_analysis_excel_file_name,
     resolve_analysis_display_name,
 )

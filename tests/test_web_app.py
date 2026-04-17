@@ -2144,7 +2144,7 @@ class WebAppTestCase(unittest.TestCase):
             self.assertIn(col, first_row, f"列 '{col}' が前後処理分析の結果に存在しません。")
 
     def test_get_terminology_rows(self):
-        from web_reports.excel_common import get_terminology_rows
+        from excel.common import get_terminology_rows
 
         freq_rows = get_terminology_rows("frequency")
         self.assertTrue(any(row["用語"] == "イベント比率(%)" for row in freq_rows))
