@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -7,7 +7,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v={{ static_version }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/layout.css') }}?v={{ static_version }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}?v={{ static_version }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/detail.css') }}?v={{ static_version }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/pattern.css') }}?v={{ static_version }}">
 </head>
 <body class="app-shell app-shell--detail" data-pattern-index="{{ pattern_index }}">
     <header class="dashboard-app-header">
@@ -120,6 +124,9 @@
     </div>
 
     <script src="{{ url_for('static', path='/process_mining_shared.js') }}?v={{ static_version }}"></script>
+    <script src="{{ url_for('static', path='/pattern/steps.js') }}?v={{ static_version }}"></script>
+    <script src="{{ url_for('static', path='/pattern/transitions.js') }}?v={{ static_version }}"></script>
+    <script src="{{ url_for('static', path='/pattern/cases.js') }}?v={{ static_version }}"></script>
     <script src="{{ url_for('static', path='/pattern_detail.js') }}?v={{ static_version }}"></script>
 </body>
 </html>
