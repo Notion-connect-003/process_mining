@@ -199,7 +199,7 @@ async function downloadLogDiagnosticsExcel() {
         }
 
         const blob = await response.blob();
-        const downloadFileName = getDownloadFileName(response, "log_diagnostics.xlsx");
+        const downloadFileName = sharedUi.getDownloadFileName(response, "log_diagnostics.xlsx");
         triggerFileDownload(blob, downloadFileName);
         setStatus("ログ診断Excelを出力しました。", "success");
         saveTopPageState();
