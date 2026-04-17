@@ -642,29 +642,3 @@ def create_variant_flow_snapshot(
         pattern_cap=1,
     )
 
-
-# -----------------------------------------------------------------------------`n# Compatibility entry point
-# -----------------------------------------------------------------------------
-
-def analyze_event_log(
-    file_source,
-    case_id_column,
-    activity_column,
-    timestamp_column,
-    selected_analysis_keys=None,
-    output_root_dir=None,
-    export_excel=False,
-):
-    from core.analysis_core import load_prepared_event_log, analyze_prepared_event_log
-    prepared_df = load_prepared_event_log(
-        file_source=file_source,
-        case_id_column=case_id_column,
-        activity_column=activity_column,
-        timestamp_column=timestamp_column,
-    )
-    return analyze_prepared_event_log(
-        prepared_df=prepared_df,
-        selected_analysis_keys=selected_analysis_keys,
-        output_root_dir=output_root_dir,
-        export_excel=export_excel,
-    )
