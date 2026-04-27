@@ -117,7 +117,10 @@ def register_detail_routes(
                 "repeat_rate_pct": summary_row.get("繰り返し率(%)", 0),
                 "repeat_rate_band": summary_row.get("繰り返し率区分", ""),
                 "review_flag": summary_row.get("確認区分", ""),
-                "avg_case_duration_diff_min": summary_row.get("平均処理時間差分(分)", 0),
+                "avg_case_duration_diff_min": summary_row.get(
+                    "平均所要時間差分(分)",
+                    summary_row.get("平均処理時間差分(分)", 0),
+                ),
                 "improvement_priority_score": summary_row.get("改善優先度スコア", 0),
                 "overall_impact_pct": summary_row.get("全体影響度(%)", 0),
                 "fastest_pattern_flag": summary_row.get("最短処理", ""),

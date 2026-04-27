@@ -132,13 +132,13 @@ def _build_simple_comment(repeat_count, repeat_rate_pct, avg_duration_diff_min, 
         return "最短・低繰り返しの安定パターン。"
 
     if safe_repeat_rate_pct >= HIGH_REPEAT_RATE_THRESHOLD_PCT and safe_avg_duration_diff_min > 0:
-        return "繰り返し率高・処理長め。優先確認候補。"
+        return "繰り返し率高・所要時間長め。優先確認候補。"
     if safe_repeat_rate_pct >= LOW_REPEAT_RATE_THRESHOLD_PCT and safe_avg_duration_diff_min > 0:
-        return "繰り返しあり・処理長め。改善候補。"
+        return "繰り返しあり・所要時間長め。改善候補。"
     if safe_repeat_count > 0:
         return "繰り返しあり。"
     if safe_avg_duration_diff_min > 0:
-        return "処理時間が平均超過。"
+        return "所要時間が平均超過。"
     return "安定パターン。"
 
 

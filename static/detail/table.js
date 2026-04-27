@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Detail page module.
  * Depends on: window.ProcessMiningShared and earlier detail scripts.
  * Exposes: script-scoped functions used by static/detail.js entrypoint.

@@ -28,6 +28,7 @@ from reports.excel.common import (
     initialize_excel_worksheet,
     get_terminology_rows,
     merge_excel_row,
+    rename_excel_display_columns,
     sanitize_workbook_sheet_name,
 )
 
@@ -158,7 +159,7 @@ def _append_detail_export_summary_sheet(
         group_summary_df.to_dict(orient="records"),
         list(group_summary_df.columns),
         start_row=next_row + 2,
-        description="グルーピング条件ごとのケース数・処理時間の比較です。",
+        description="グルーピング条件ごとのケース数・所要時間の比較です。",
     )
 
 def _insert_spacer_row(worksheet, row_index, column_count=6, height=8):
@@ -168,13 +169,34 @@ def _insert_spacer_row(worksheet, row_index, column_count=6, height=8):
     return row_index + 1
 
 
+def _build_ai_generation_mode_label(ai_summary):
+    mode = str((ai_summary or {}).get("mode") or "").strip().lower()
+    note = str((ai_summary or {}).get("note") or "").strip()
+    provider = str((ai_summary or {}).get("provider") or "").strip()
+    if mode in {"ollama", "openai", "llm"}:
+        return f"AI生成（{provider or mode}）"
+    if mode in {"fallback", "rule_based"}:
+        return f"既存集計（{note or provider or 'AI生成なし'}）"
+    if mode == "idle":
+        return "未生成"
+    return provider or mode or "不明"
+
+
 def _append_detail_export_ai_sheet(workbook, context, analysis_key=""):
     ai_sheet = _create_report_sheet(workbook, REPORT_SHEET_NAMES["ai_insights"])
+    period_text = (
+        str(context.get("period_text") or "").strip()
+        or str(context.get("ai_summary", {}).get("period") or "").strip()
+        or "不明"
+    )
     ai_meta_rows = [
         ("対象分析", context["analysis_name"]),
-        ("分析期間", context["ai_summary"].get("period", "不明")),
+        ("分析期間", period_text),
+        ("生成モード", _build_ai_generation_mode_label(context.get("ai_summary", {}))),
         ("出力時刻", context["ai_summary"].get("generated_at", "")),
     ]
+    if context["ai_summary"].get("note"):
+        ai_meta_rows.append(("生成メモ", context["ai_summary"].get("note", "")))
     next_row = append_key_value_rows(
         ai_sheet,
         REPORT_SHEET_NAMES["ai_insights"],
@@ -233,14 +255,17 @@ def _append_frequency_export_sheet(workbook, context, run_data, filter_params):
     variant_pattern = context["variant_pattern"]
 
     if not group_columns:
-        frequency_rows = build_ranked_rows(selected_analysis["rows"], rank_key=REPORT_HEADER_LABELS["rank"])
+        frequency_rows = build_ranked_rows(
+            [rename_excel_display_columns(row) for row in selected_analysis["rows"]],
+            rank_key=REPORT_HEADER_LABELS["rank"],
+        )
         frequency_headers = list(frequency_rows[0].keys()) if frequency_rows else [REPORT_HEADER_LABELS["rank"]]
         append_table_to_worksheet(
             frequency_sheet,
             REPORT_SHEET_NAMES["frequency"],
             frequency_rows,
             frequency_headers,
-            description="アクティビティごとの件数、ケース数、処理時間の代表値を確認できます。",
+            description="アクティビティごとの件数、ケース数、所要時間の代表値を確認できます。",
         )
         return
 
@@ -399,7 +424,7 @@ def _append_impact_export_sheet(workbook, context):
         REPORT_SHEET_NAMES["impact"],
         impact_rows,
         impact_headers,
-        description="改善インパクトが高い遷移を優先順位付きで確認できます。",
+        description="改善インパクトスコアは平均所要時間 × 対象ケース数で算出した優先度スコアです。判断時は改善インパクト比率(%)も併せて確認してください。",
     )
 
 def _append_drilldown_export_sheet(

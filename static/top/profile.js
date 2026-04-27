@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Top page module.
  * Depends on: window.ProcessMiningShared and earlier top scripts.
  * Exposes: script-scoped functions used by static/app.js entrypoint.
@@ -819,7 +819,7 @@ function renderAnalysisPanels(analyses, runId, groupColumns = []) {
         });
     });
 
-    // 繧ｰ繝ｫ繝ｼ繝励ち繝悶・繧､繝吶Φ繝医Μ繧ｹ繝翫・險ｭ螳夲ｼ医し繝ｼ繝舌・蜀榊・譫撰ｼ・
+    // グループタブやパンくずは、選択した値をフォームのフィルターへ反映して再分析する。
     if (isGroupMode) {
         resultPanels.querySelectorAll(".group-tab-bar").forEach((tabBar) => {
             const groupCol = tabBar.dataset.groupCol;
@@ -830,9 +830,9 @@ function renderAnalysisPanels(analyses, runId, groupColumns = []) {
                     const slotIndex = findFilterSlotByColumn(groupCol);
 
                     if (selectedValue) {
-                        // 繧ｰ繝ｫ繝ｼ繝怜､繧帝∈謚・竊・縺昴・繧ｹ繝ｭ繝・ヨ繧偵ヵ繧｣繝ｫ繧ｿ繝ｪ繝ｳ繧ｰ繝｢繝ｼ繝峨↓蛻・ｊ譖ｿ縺医※蜀榊・譫・
+                        // 既存のグループ値を使う場合は、そのスロット以降の選択をクリアして整合性を保つ。
                         if (slotIndex >= 0) {
-                            // 荳倶ｽ阪せ繝ｭ繝・ヨ縺ｮ繝輔ぅ繝ｫ繧ｿ繝ｼ蛟､繧偵け繝ｪ繧｢・域ｬ｡縺ｮ髫主ｱ､縺ｯ繧ｰ繝ｫ繝ｼ繝励Δ繝ｼ繝峨・縺ｾ縺ｾ・・
+                            // 下位スロットの値は、上位グループが変わると意味が変わるのでまとめて落とす。
                             for (let i = slotIndex + 1; i < filterColumnRefs.length; i++) {
                                 if (filterColumnRefs[i].valueSelect) {
                                     filterColumnRefs[i].valueSelect.value = "";
@@ -841,7 +841,7 @@ function renderAnalysisPanels(analyses, runId, groupColumns = []) {
                             filterColumnRefs[slotIndex].valueSelect.value = selectedValue;
                         }
                     } else {
-                        // 縲悟・菴薙阪ち繝・竊・蜈ｨ繧ｹ繝ｭ繝・ヨ縺ｮ繝輔ぅ繝ｫ繧ｿ繝ｼ蛟､繧偵け繝ｪ繧｢縺励※蜀榊・譫・
+                        // 「全体」を選んだときは、グループ系の値をすべてクリアする。
                         filterColumnRefs.forEach((ref) => {
                             if (ref.valueSelect) ref.valueSelect.value = "";
                         });
@@ -852,12 +852,12 @@ function renderAnalysisPanels(analyses, runId, groupColumns = []) {
             });
         });
 
-        // 繝代Φ縺上★縺ｮ縲梧綾繧九阪け繝ｪ繝・け 竊・荳贋ｽ埼嚴螻､縺ｫ謌ｻ縺｣縺ｦ蜀榊・譫・
+        // パンくずの途中を押したときは、その段より下のフィルターを外して戻る。
         resultPanels.querySelectorAll(".breadcrumb-item--link").forEach((crumb) => {
             crumb.addEventListener("click", () => {
                 const drillIndex = Number.parseInt(crumb.dataset.drillIndex ?? "-1", 10);
-                // drillIndex=-1 竊・蜈ｨ菴難ｼ亥・繧ｹ繝ｭ繝・ヨ繧ｯ繝ｪ繧｢・・
-                // drillIndex=n 竊・n+1髫主ｱ､繧医ｊ荳九ｒ繧ｯ繝ｪ繧｢
+                // `drillIndex=-1` は全解除、`drillIndex=n` は n+1 段目以降を解除する。
+                // 途中のパンくずを押した場合は、その下位の段をまとめて外す。
                 const clearFrom = drillIndex + 1;
                 for (let i = clearFrom; i < filterColumnRefs.length; i++) {
                     if (filterColumnRefs[i].valueSelect) {

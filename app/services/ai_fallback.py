@@ -19,7 +19,7 @@ def _build_group_comparison_lines(group_summary):
     avg_duration_key = next(
         (
             key
-            for key in ["avg_case_duration_min", "平均処理時間(分)", "avg_duration_min"]
+            for key in ["avg_case_duration_min", "平均所要時間(分)", "平均処理時間(分)", "avg_duration_min"]
             if key in group_rows[0]
         ),
         None,
@@ -55,7 +55,7 @@ def _build_group_comparison_lines(group_summary):
         min_dur = float(min_dur_group.get(avg_duration_key, 0) or 0)
         if max_dur > 0:
             lines.append(
-                f"- 平均処理時間が最も長いグループは「{max_dur_group.get(value_key, '不明')}」"
+                f"- 平均所要時間が最も長いグループは「{max_dur_group.get(value_key, '不明')}」"
                 f"（{max_dur:.1f}分）、最も短いのは「{min_dur_group.get(value_key, '不明')}」"
                 f"（{min_dur:.1f}分）です。"
             )

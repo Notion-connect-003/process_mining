@@ -5,6 +5,8 @@
  */
 window.ProcessMiningDetail = window.ProcessMiningDetail || {};
 
+const TIMESTAMP_DURATION_NOTE = "処理時間は1列のタイムスタンプから算出するため、休憩・待機・営業時間外など、実際に作業していない時間を含む可能性があります。";
+
 function buildAiInsightsApiUrl(runId, filters = activeDetailFilters, forceRefresh = false) {
     const params = new URLSearchParams();
     buildFilterQueryParams(filters).forEach((value, key) => {
@@ -53,7 +55,9 @@ function renderAiInsightsPayload(payload, analysisName = "") {
     if (!payload?.generated) {
         currentAiInsightsPayload = payload || null;
         aiInsightsMeta.textContent = "分析ごとに生成し、画面を切り替えても同じ条件なら再表示されます。";
-        aiInsightsNote.textContent = payload?.note || "まだ生成していません。";
+        aiInsightsNote.textContent = payload?.note
+            ? `${payload.note} ${TIMESTAMP_DURATION_NOTE}`
+            : `まだ生成していません。${TIMESTAMP_DURATION_NOTE}`;
         aiInsightsOutput.textContent = "";
         aiInsightsOutput.classList.add("hidden");
         aiInsightsButton.disabled = false;
@@ -65,13 +69,15 @@ function renderAiInsightsPayload(payload, analysisName = "") {
     currentAiInsightsPayload = payload;
     const generatedAtLabel = payload.generated_at ? formatDateTime(payload.generated_at) : "";
     aiInsightsMeta.textContent = generatedAtLabel || "現在の分析条件に対応する解説です。";
-    aiInsightsNote.textContent = payload.note || "現在の分析条件に対応する解説です。";
+    aiInsightsNote.textContent = payload.note
+        ? `${payload.note} ${TIMESTAMP_DURATION_NOTE}`
+        : `現在の分析条件に対応する解説です。${TIMESTAMP_DURATION_NOTE}`;
     aiInsightsOutput.textContent = payload.text || "";
     aiInsightsOutput.classList.toggle("hidden", !payload.text);
     aiInsightsButton.disabled = false;
     aiInsightsButton.textContent = payload.cached ? "分析コメントを再生成" : "分析コメントを更新";
 
-    if (payload.mode === "rule_based") {
+    if (payload.mode === "rule_based" || payload.mode === "fallback") {
         setAiInsightsChip(payload.cached ? "要約保存済み" : "要約生成済み", "fallback");
     } else {
         setAiInsightsChip(payload.cached ? "保存済み" : "生成済み", "ready");
@@ -86,7 +92,7 @@ function renderAiInsightsLoading(analysisName = "") {
     const resolvedAnalysisName = analysisName || detailPageTitle?.textContent?.trim() || "";
     aiInsightsTitle.textContent = resolvedAnalysisName ? `${resolvedAnalysisName} 分析コメント` : "分析コメント";
     aiInsightsMeta.textContent = "現在の分析条件に対する解説を生成しています。";
-    aiInsightsNote.textContent = "生成中です。完了すると画面切替後も保持されます。";
+    aiInsightsNote.textContent = `生成中です。完了すると画面切替後も保持されます。${TIMESTAMP_DURATION_NOTE}`;
     aiInsightsOutput.textContent = "解説を生成しています...";
     aiInsightsOutput.classList.remove("hidden");
     aiInsightsButton.disabled = true;
@@ -145,9 +151,10 @@ function syncDetailExportPanel(analysisName = "", options = {}) {
 
     detailExportTitle.textContent = `${resolvedAnalysisName}のExcelレポート`;
     detailExportMeta.textContent = metaText;
-    detailExportNote.textContent = selectionItems.length
+    const exportConditionText = selectionItems.length
         ? `現在の絞り込みと ${selectionItems.join(" / ")} の選択状態も反映して出力します。`
         : "現在の絞り込み条件を反映して出力します。";
+    detailExportNote.textContent = `${exportConditionText}${TIMESTAMP_DURATION_NOTE}`;
     detailExportScope.innerHTML = chips
         .filter(Boolean)
         .map((item) => `<span class="detail-export-chip">${escapeHtml(item)}</span>`)

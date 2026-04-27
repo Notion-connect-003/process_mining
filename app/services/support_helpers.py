@@ -157,13 +157,12 @@ def resolve_profile_file_source(form, profile_sample_file):
 
 def get_static_version(base_dir):
     static_dir = base_dir / "static"
-    return str(
-        max(
-            entry.stat().st_mtime_ns
-            for entry in static_dir.iterdir()
-            if entry.is_file()
-        )
-    )
+    static_file_versions = [
+        entry.stat().st_mtime_ns
+        for entry in static_dir.rglob("*")
+        if entry.is_file()
+    ]
+    return str(max(static_file_versions, default=0))
 
 
 def build_analysis_payload(analysis, row_limit=None, row_offset=0):

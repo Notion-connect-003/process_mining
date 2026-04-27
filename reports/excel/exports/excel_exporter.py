@@ -12,8 +12,10 @@ from reports.excel.common import (
     EXCEL_GROUP_SECTION_FONT,
     EXCEL_HEADER_FILL,
     EXCEL_THIN_BORDER,
+    EXCEL_DISPLAY_COLUMN_RENAMES,
     autosize_worksheet_columns,
     initialize_excel_worksheet,
+    rename_excel_display_columns,
     sanitize_workbook_sheet_name,
     style_excel_cell,
 )
@@ -73,10 +75,10 @@ SUMMARY_SHEET_COLUMNS = [
     "ケース比率(%)",
     "イベント数",
     "イベント比率(%)",
-    "平均処理時間(分)",
-    "中央値処理時間(分)",
-    "最大処理時間(分)",
-    "合計処理時間(分)",
+    "平均所要時間(分)",
+    "中央値所要時間(分)",
+    "最大所要時間(分)",
+    "合計所要時間(分)",
 ]
 
 
@@ -136,10 +138,10 @@ def build_summary_sheet_df(group_summary, group_columns):
                     "ケース比率(%)": stats.get("case_ratio_pct", ""),
                     "イベント数": stats.get("event_count", ""),
                     "イベント比率(%)": stats.get("event_ratio_pct", ""),
-                    "平均処理時間(分)": _duration_cell_value(stats.get("avg_duration_min")),
-                    "中央値処理時間(分)": _duration_cell_value(stats.get("median_duration_min")),
-                    "最大処理時間(分)": _duration_cell_value(stats.get("max_duration_min")),
-                    "合計処理時間(分)": _duration_cell_value(stats.get("total_duration_min")),
+                    "平均所要時間(分)": _duration_cell_value(stats.get("avg_duration_min")),
+                    "中央値所要時間(分)": _duration_cell_value(stats.get("median_duration_min")),
+                    "最大所要時間(分)": _duration_cell_value(stats.get("max_duration_min")),
+                    "合計所要時間(分)": _duration_cell_value(stats.get("total_duration_min")),
                 }
             )
 
@@ -159,10 +161,10 @@ def build_summary_sheet_df(group_summary, group_columns):
                 "ケース比率(%)": 100.0 if meta else "",
                 "イベント数": meta.get("total_event_count", ""),
                 "イベント比率(%)": 100.0 if meta else "",
-                "平均処理時間(分)": _duration_cell_value(meta.get("avg_duration_min")) if meta else "—",
-                "中央値処理時間(分)": _duration_cell_value(meta.get("median_duration_min")) if meta else "—",
-                "最大処理時間(分)": _duration_cell_value(meta.get("max_duration_min")) if meta else "—",
-                "合計処理時間(分)": _duration_cell_value(meta.get("total_duration_min")) if meta else "—",
+                "平均所要時間(分)": _duration_cell_value(meta.get("avg_duration_min")) if meta else "—",
+                "中央値所要時間(分)": _duration_cell_value(meta.get("median_duration_min")) if meta else "—",
+                "最大所要時間(分)": _duration_cell_value(meta.get("max_duration_min")) if meta else "—",
+                "合計所要時間(分)": _duration_cell_value(meta.get("total_duration_min")) if meta else "—",
             }
         ],
         columns=SUMMARY_SHEET_COLUMNS,
@@ -188,10 +190,15 @@ def build_excel_bytes(df, sheet_name, group_columns=None, group_summary=None):
             _style_export_worksheet(writer.sheets[summary_sheet_name])
 
         safe_sheet_name = sanitize_workbook_sheet_name(sheet_name)
-        df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
+        excel_df = (
+            pd.DataFrame([rename_excel_display_columns(row) for row in df.to_dict(orient="records")])
+            if not df.empty
+            else df.rename(columns=EXCEL_DISPLAY_COLUMN_RENAMES)
+        )
+        excel_df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
         worksheet = writer.sheets[safe_sheet_name]
         if group_columns:
-            insert_group_section_rows(worksheet, df, group_columns)
+            insert_group_section_rows(worksheet, excel_df, group_columns)
         _style_export_worksheet(worksheet)
 
     return buffer.getvalue()

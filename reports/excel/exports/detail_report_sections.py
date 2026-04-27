@@ -22,6 +22,7 @@ from reports.excel.common import (
     initialize_excel_worksheet,
     merge_excel_row,
     normalize_excel_cell_value,
+    rename_excel_display_columns,
     sanitize_workbook_sheet_name,
     style_excel_cell,
 )
@@ -188,7 +189,10 @@ def _iter_groups_from_parquet(
         connection.close()
 
 def _write_frequency_data(worksheet, rows, start_row):
-    frequency_rows = build_ranked_rows(rows or [], rank_key=REPORT_HEADER_LABELS["rank"])
+    frequency_rows = build_ranked_rows(
+        [rename_excel_display_columns(row) for row in (rows or [])],
+        rank_key=REPORT_HEADER_LABELS["rank"],
+    )
     frequency_headers = list(frequency_rows[0].keys()) if frequency_rows else [REPORT_HEADER_LABELS["rank"]]
     header_row = start_row
     for column_index, header in enumerate(frequency_headers, start=1):
@@ -281,11 +285,20 @@ def _write_chart_data_block(workbook, block_label, comparison_rows, columns):
 def build_excel_anchor(column_letter, row_number):
     return f"{column_letter}{max(1, int(row_number or 1))}"
 
+def get_report_value(row, *keys, default=None):
+    for key in keys:
+        if key in row and row.get(key) not in (None, ""):
+            return row.get(key)
+    return default
+
 def sort_pattern_rows_by_avg_duration_desc(rows):
     return sorted(
         rows,
         key=lambda row: (
-            -coerce_report_number(row.get("平均処理時間(分)"), 0.0),
+            -coerce_report_number(
+                get_report_value(row, "平均所要時間(分)", "平均処理時間(分)", default=0.0),
+                0.0,
+            ),
             row.get("順位", 0),
         ),
     )
@@ -332,7 +345,7 @@ def append_pattern_conclusion_charts(workbook, worksheet, comparison_rows, pie_a
         workbook,
         "conclusion_duration_desc",
         bar_rows,
-        ["パターン", "平均処理時間(分)"],
+        ["パターン", "平均所要時間(分)"],
     )
 
     pie_chart = PieChart()
@@ -359,7 +372,7 @@ def append_pattern_conclusion_charts(workbook, worksheet, comparison_rows, pie_a
     bar_chart = BarChart()
     bar_chart.type = "bar"
     bar_chart.style = 10
-    bar_chart.title = "平均処理時間の比較（長い順）"
+    bar_chart.title = "平均所要時間の比較（長い順）"
     bar_chart.height = 14.0
     bar_chart.width = 16.0
     bar_chart.legend = None
@@ -416,17 +429,20 @@ def append_pattern_detail_sheet(
             ("繰り返し率(%)", pattern_row.get("繰り返し率(%)", 0)),
             ("繰り返し率区分", pattern_row.get("繰り返し率区分", "")),
             ("確認区分", pattern_row.get("確認区分", "")),
-            ("平均処理時間差分(分)", pattern_row.get("平均処理時間差分(分)", 0)),
+            (
+                "平均所要時間差分(分)",
+                get_report_value(pattern_row, "平均所要時間差分(分)", "平均処理時間差分(分)", default=0),
+            ),
             ("改善優先度スコア", pattern_row.get("改善優先度スコア", 0)),
             ("全体影響度(%)", pattern_row.get("全体影響度(%)", 0)),
             ("最短処理", pattern_row.get("最短処理", "")),
             ("簡易コメント", pattern_row.get("簡易コメント", "")),
             ("ケース数", detail.get("case_count", 0)),
             ("ケース比率(%)", detail.get("case_ratio_pct", 0)),
-            ("平均ケース処理時間(分)", detail.get("avg_case_duration_min", 0)),
-            ("中央値ケース処理時間(分)", detail.get("median_case_duration_min", 0)),
-            ("最小ケース処理時間(分)", detail.get("min_case_duration_min", 0)),
-            ("最大ケース処理時間(分)", detail.get("max_case_duration_min", 0)),
+            ("平均ケース所要時間(分)", detail.get("avg_case_duration_min", 0)),
+            ("中央値ケース所要時間(分)", detail.get("median_case_duration_min", 0)),
+            ("最小ケース所要時間(分)", detail.get("min_case_duration_min", 0)),
+            ("最大ケース所要時間(分)", detail.get("max_case_duration_min", 0)),
             ("代表ルート", pattern_text),
             ("ボトルネック遷移", bottleneck_transition.get("transition_label", "該当なし")),
             ("ボトルネック平均所要時間(分)", bottleneck_transition.get("avg_duration_min", 0)),
@@ -493,7 +509,7 @@ def append_pattern_detail_sheet(
         case_example_rows,
         case_example_headers,
         start_row=next_row,
-        description="このパターンに属するケースのうち、総処理時間が長いケースを上位から掲載しています。",
+        description="このパターンに属するケースのうち、総所要時間が長いケースを上位から掲載しています。",
     )
 
 def build_detail_summary_kpi_rows(
@@ -516,13 +532,13 @@ def build_detail_summary_kpi_rows(
     top_impact_row = impact_summary["rows"][0] if impact_summary.get("rows") else None
 
     common_rows = [
-        ("平均ケース処理時間", dashboard_summary.get("avg_case_duration_text", "0s")),
-        ("中央値ケース処理時間", dashboard_summary.get("median_case_duration_text", "0s")),
+        ("平均ケース所要時間", dashboard_summary.get("avg_case_duration_text", "0s")),
+        ("中央値ケース所要時間", dashboard_summary.get("median_case_duration_text", "0s")),
     ]
 
     if normalized_analysis_key == "frequency":
         frequency_rows = common_rows + [
-            ("最大ケース処理時間", dashboard_summary.get("max_case_duration_text", "0s")),
+            ("最大ケース所要時間", dashboard_summary.get("max_case_duration_text", "0s")),
             ("最多アクティビティ", top_row.get("アクティビティ", "該当なし") if top_row else "該当なし"),
             ("最多アクティビティ件数", normalize_excel_cell_value(top_row.get("イベント件数", 0)) if top_row else 0),
             ("上位10バリアントカバー率", f"{float(dashboard_summary.get('top10_variant_coverage_pct', 0.0)):.2f}%"),
@@ -565,7 +581,7 @@ def build_detail_summary_kpi_rows(
         ]
 
     return common_rows + [
-        ("最大ケース処理時間", dashboard_summary.get("max_case_duration_text", "0s")),
+        ("最大ケース所要時間", dashboard_summary.get("max_case_duration_text", "0s")),
         ("最大ボトルネック遷移", top_transition_bottleneck_label),
     ]
 

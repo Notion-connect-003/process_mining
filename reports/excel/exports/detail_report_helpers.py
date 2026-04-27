@@ -162,7 +162,7 @@ def build_pattern_overview_rows(pattern_rows, variant_items, pattern_column_labe
     repeat_rate_label = pattern_display_columns.get("repeat_rate_pct", "繰り返し率(%)")
     repeat_rate_band_label = pattern_display_columns.get("repeat_rate_band", "繰り返し率区分")
     review_flag_label = pattern_display_columns.get("review_flag", "確認区分")
-    avg_case_duration_diff_label = pattern_display_columns.get("avg_case_duration_diff_min", "平均処理時間差分(分)")
+    avg_case_duration_diff_label = pattern_display_columns.get("avg_case_duration_diff_min", "平均所要時間差分(分)")
     improvement_priority_score_label = pattern_display_columns.get("improvement_priority_score", "改善優先度スコア")
     overall_impact_pct_label = pattern_display_columns.get("overall_impact_pct", "全体影響度(%)")
     fastest_pattern_flag_label = pattern_display_columns.get("fastest_pattern_flag", "最短処理")
@@ -174,13 +174,13 @@ def build_pattern_overview_rows(pattern_rows, variant_items, pattern_column_labe
     case_count_label = pattern_display_columns.get("case_count", "ケース数")
     case_ratio_label = pattern_display_columns.get("case_ratio_pct", "ケース比率(%)")
     cumulative_case_ratio_label = pattern_display_columns.get("cumulative_case_ratio_pct", "累積カバー率(%)")
-    avg_case_duration_label = pattern_display_columns.get("avg_case_duration_min", "平均ケース処理時間(分)")
-    std_case_duration_label = pattern_display_columns.get("std_case_duration_min", "標準偏差ケース処理時間(分)")
-    min_case_duration_label = pattern_display_columns.get("min_case_duration_min", "最小ケース処理時間(分)")
-    max_case_duration_label = pattern_display_columns.get("max_case_duration_min", "最大ケース処理時間(分)")
-    p75_case_duration_label = pattern_display_columns.get("p75_case_duration_min", "75%点ケース処理時間(分)")
-    p90_case_duration_label = pattern_display_columns.get("p90_case_duration_min", "90%点ケース処理時間(分)")
-    p95_case_duration_label = pattern_display_columns.get("p95_case_duration_min", "95%点ケース処理時間(分)")
+    avg_case_duration_label = pattern_display_columns.get("avg_case_duration_min", "平均ケース所要時間(分)")
+    std_case_duration_label = pattern_display_columns.get("std_case_duration_min", "標準偏差ケース所要時間(分)")
+    min_case_duration_label = pattern_display_columns.get("min_case_duration_min", "最小ケース所要時間(分)")
+    max_case_duration_label = pattern_display_columns.get("max_case_duration_min", "最大ケース所要時間(分)")
+    p75_case_duration_label = pattern_display_columns.get("p75_case_duration_min", "75%点ケース所要時間(分)")
+    p90_case_duration_label = pattern_display_columns.get("p90_case_duration_min", "90%点ケース所要時間(分)")
+    p95_case_duration_label = pattern_display_columns.get("p95_case_duration_min", "95%点ケース所要時間(分)")
     variant_by_pattern = {
         str(variant_item.get("pattern") or "").strip(): variant_item
         for variant_item in (variant_items or [])
@@ -233,13 +233,55 @@ def coerce_report_number(value, default=0.0):
     except (TypeError, ValueError):
         return float(default)
 
+
+def format_pattern_minutes_scale(minutes):
+    safe_minutes = max(0.0, coerce_report_number(minutes, 0.0))
+    return (
+        f"{safe_minutes:,.2f}分"
+        f"（約{safe_minutes / 60.0:,.2f}時間 / 約{safe_minutes / 1440.0:,.2f}日）"
+    )
+
+
+def compact_pattern_route_for_excel(pattern_text, head_steps=4, tail_steps=3, max_steps=9):
+    text = str(pattern_text or "").strip()
+    if not text:
+        return ""
+    steps = [step.strip() for step in text.split("→") if step.strip()]
+    if len(steps) <= max_steps:
+        return text
+    return "→".join(steps[:head_steps] + ["…"] + steps[-tail_steps:])
+
+
+def build_pattern_detail_link(rank, detail_sheet_count):
+    try:
+        safe_rank = int(rank)
+        safe_detail_sheet_count = int(detail_sheet_count)
+    except (TypeError, ValueError):
+        return ""
+    if safe_rank <= 0 or safe_rank > safe_detail_sheet_count:
+        return ""
+    sheet_name = f"パターン{safe_rank:02d}詳細"
+    escaped_sheet_name = sheet_name.replace("'", "''")
+    return f'=HYPERLINK("#\'{escaped_sheet_name}\'!A1","{sheet_name}")'
+
+
+def attach_pattern_detail_links(pattern_summary, detail_sheet_count):
+    for rows_key in ("comparison_rows", "repeated_patterns", "improvement_targets"):
+        for row in pattern_summary.get(rows_key, []):
+            row["詳細リンク"] = build_pattern_detail_link(row.get("順位"), detail_sheet_count)
+    fastest_pattern = pattern_summary.get("fastest_pattern")
+    if fastest_pattern:
+        fastest_pattern["詳細リンク"] = build_pattern_detail_link(fastest_pattern.get("順位"), detail_sheet_count)
+    return pattern_summary
+
+
 def build_pattern_export_summary(pattern_rows, pattern_display_columns):
     repeat_flag_label = pattern_display_columns.get("repeat_flag", "繰り返し")
     repeat_count_label = pattern_display_columns.get("repeat_count", "繰り返し回数")
     repeat_rate_label = pattern_display_columns.get("repeat_rate_pct", "繰り返し率(%)")
     repeat_rate_band_label = pattern_display_columns.get("repeat_rate_band", "繰り返し率区分")
     review_flag_label = pattern_display_columns.get("review_flag", "確認区分")
-    avg_case_duration_diff_label = pattern_display_columns.get("avg_case_duration_diff_min", "平均処理時間差分(分)")
+    avg_case_duration_diff_label = pattern_display_columns.get("avg_case_duration_diff_min", "平均所要時間差分(分)")
     improvement_priority_score_label = pattern_display_columns.get("improvement_priority_score", "改善優先度スコア")
     overall_impact_pct_label = pattern_display_columns.get("overall_impact_pct", "全体影響度(%)")
     fastest_pattern_flag_label = pattern_display_columns.get("fastest_pattern_flag", "最短処理")
@@ -247,15 +289,16 @@ def build_pattern_export_summary(pattern_rows, pattern_display_columns):
     case_count_label = pattern_display_columns.get("case_count", "ケース数")
     case_ratio_label = pattern_display_columns.get("case_ratio_pct", "ケース比率(%)")
     cumulative_case_ratio_label = pattern_display_columns.get("cumulative_case_ratio_pct", "累積カバー率(%)")
-    avg_case_duration_label = pattern_display_columns.get("avg_case_duration_min", "平均ケース処理時間(分)")
-    min_case_duration_label = pattern_display_columns.get("min_case_duration_min", "最小ケース処理時間(分)")
-    max_case_duration_label = pattern_display_columns.get("max_case_duration_min", "最大ケース処理時間(分)")
+    avg_case_duration_label = pattern_display_columns.get("avg_case_duration_min", "平均ケース所要時間(分)")
+    min_case_duration_label = pattern_display_columns.get("min_case_duration_min", "最小ケース所要時間(分)")
+    max_case_duration_label = pattern_display_columns.get("max_case_duration_min", "最大ケース所要時間(分)")
     pattern_label = pattern_display_columns.get("pattern", "処理順パターン")
 
     comparison_rows = []
     repeated_patterns = []
     improvement_targets = []
     for index, pattern_row in enumerate(pattern_rows or [], start=1):
+        pattern_text = str(pattern_row.get(pattern_label, "") or "").strip()
         comparison_row = {
             "順位": index,
             "繰り返し": pattern_row.get(repeat_flag_label, ""),
@@ -264,16 +307,17 @@ def build_pattern_export_summary(pattern_rows, pattern_display_columns):
             "繰り返し率区分": pattern_row.get(repeat_rate_band_label, ""),
             "件数": pattern_row.get(case_count_label, 0),
             "全体比率(%)": pattern_row.get(case_ratio_label, 0),
-            "平均処理時間(分)": pattern_row.get(avg_case_duration_label, 0),
-            "平均処理時間差分(分)": pattern_row.get(avg_case_duration_diff_label, 0),
+            "平均所要時間(分)": pattern_row.get(avg_case_duration_label, 0),
+            "平均所要時間差分(分)": pattern_row.get(avg_case_duration_diff_label, 0),
             "改善優先度スコア": pattern_row.get(improvement_priority_score_label, 0),
             "全体影響度(%)": pattern_row.get(overall_impact_pct_label, 0),
             "最短処理": pattern_row.get(fastest_pattern_flag_label, ""),
-            "最短処理時間(分)": pattern_row.get(min_case_duration_label, 0),
-            "最長処理時間(分)": pattern_row.get(max_case_duration_label, 0),
+            "最短所要時間(分)": pattern_row.get(min_case_duration_label, 0),
+            "最長所要時間(分)": pattern_row.get(max_case_duration_label, 0),
             "確認区分": pattern_row.get(review_flag_label, ""),
             "簡易コメント": pattern_row.get(simple_comment_label, ""),
-            "パターン": pattern_row.get(pattern_label, ""),
+            "パターン": compact_pattern_route_for_excel(pattern_text),
+            "パターン全文": pattern_text,
         }
         comparison_rows.append(comparison_row)
         if str(pattern_row.get(review_flag_label, "")).strip() != "要確認":
@@ -314,15 +358,17 @@ def build_pattern_export_summary(pattern_rows, pattern_display_columns):
         key=lambda row: (
             -coerce_report_number(row.get("改善優先度スコア"), 0),
             -coerce_report_number(row.get("繰り返し率(%)"), 0),
-            -coerce_report_number(row.get("平均処理時間差分(分)"), 0),
+            -coerce_report_number(row.get("平均所要時間差分(分)"), 0),
             -coerce_report_number(row.get("件数"), 0),
             row.get("パターン", ""),
         ),
-    )[:3]
+    )
+    improvement_candidate_count = len(improvement_targets)
+    improvement_targets = improvement_targets[:3]
     fastest_pattern = min(
         comparison_rows,
         key=lambda row: (
-            coerce_report_number(row.get("平均処理時間(分)"), float("inf")),
+            coerce_report_number(row.get("平均所要時間(分)"), float("inf")),
             row.get("順位", 0),
         ),
         default=None,
@@ -342,19 +388,21 @@ def build_pattern_export_summary(pattern_rows, pattern_display_columns):
         "repeated_case_ratio_pct": repeated_case_ratio_pct,
         "fastest_pattern": fastest_pattern or {},
         "improvement_targets": improvement_targets,
+        "improvement_candidate_count": improvement_candidate_count,
     }
 
 def calculate_pattern_time_impact_minutes(pattern_row):
     return round(
-        max(0.0, coerce_report_number(pattern_row.get("平均処理時間差分(分)"), 0.0))
+        max(0.0, coerce_report_number(pattern_row.get("平均所要時間差分(分)"), 0.0))
         * max(0.0, coerce_report_number(pattern_row.get("件数"), 0.0)),
         2,
     )
 
 def build_pattern_issue_row(pattern_row):
     repeat_rate_pct = coerce_report_number(pattern_row.get("繰り返し率(%)"), 0.0)
-    duration_diff_min = coerce_report_number(pattern_row.get("平均処理時間差分(分)"), 0.0)
+    duration_diff_min = coerce_report_number(pattern_row.get("平均所要時間差分(分)"), 0.0)
     pattern_text = str(pattern_row.get("パターン") or "").strip()
+    time_impact_minutes = calculate_pattern_time_impact_minutes(pattern_row)
 
     if repeat_rate_pct >= 30:
         issue_text = f"繰り返し率が {repeat_rate_pct:.2f}% と高く、手戻りが多いパターンです。"
@@ -365,16 +413,22 @@ def build_pattern_issue_row(pattern_row):
         cause_text = "一部ケースで確認や承認のやり直しが発生し、処理が伸びている可能性があります。"
         action_text = "繰り返しが起きる工程の条件分岐を整理し、再実行の発生源を減らしてください。"
     else:
-        issue_text = f"繰り返しは少ないものの、平均処理時間が全体平均より {duration_diff_min:.2f} 分長いパターンです。"
-        cause_text = "特定工程の待ちや滞留により、パターン全体の処理時間が長くなっている可能性があります。"
+        issue_text = f"繰り返しは少ないものの、平均所要時間が全体平均より {duration_diff_min:.2f} 分長いパターンです。"
+        cause_text = "特定工程の待ちや滞留により、パターン全体の所要時間が長くなっている可能性があります。"
         action_text = "ボトルネック工程の担当・承認・待機条件を見直し、滞留時間の短縮を優先してください。"
 
     return {
         "問題点": issue_text,
         "原因": cause_text,
         "改善案": action_text,
-        "期待効果（時間短縮・分）": calculate_pattern_time_impact_minutes(pattern_row),
+        "対象ケース数": pattern_row.get("件数", 0),
+        "平均所要時間差分(分)": duration_diff_min,
+        "改善検討時間規模": format_pattern_minutes_scale(time_impact_minutes),
+        "改善検討時間規模(分)": time_impact_minutes,
+        "改善検討時間規模(時間)": round(time_impact_minutes / 60.0, 2),
+        "改善検討時間規模(日)": round(time_impact_minutes / 1440.0, 2),
         "対象パターン": pattern_text,
+        "詳細リンク": pattern_row.get("詳細リンク", ""),
     }
 
 def build_pattern_conclusion_summary(pattern_summary):
@@ -388,10 +442,15 @@ def build_pattern_conclusion_summary(pattern_summary):
         sum(calculate_pattern_time_impact_minutes(row) for row in improvement_targets),
         2,
     )
+    top3_impact_minutes = round(
+        sum(calculate_pattern_time_impact_minutes(row) for row in improvement_targets[:3]),
+        2,
+    )
     overall_summary = (
         f"上位10パターンで {coerce_report_number(pattern_summary.get('top10_coverage_pct', 0.0)):.2f}% をカバーし、"
-        f"要確認パターンは {len(repeated_patterns)} 件、改善対象TOP3で約 "
-        f"{round(sum(calculate_pattern_time_impact_minutes(row) for row in improvement_targets[:3]), 2):.2f} 分の短縮余地があります。"
+        f"要確認パターンは {len(repeated_patterns)} 件、改善候補パターンは "
+        f"{int(pattern_summary.get('improvement_candidate_count') or 0)} 件です。"
+        f"改善対象TOP3の時間規模は {format_pattern_minutes_scale(top3_impact_minutes)} です。"
     )
 
     return {
@@ -399,8 +458,11 @@ def build_pattern_conclusion_summary(pattern_summary):
         "issue_rows": issue_rows,
         "total_impact_minutes": total_impact_minutes,
         "total_impact_hours": round(total_impact_minutes / 60.0, 2),
+        "total_impact_days": round(total_impact_minutes / 1440.0, 2),
+        "total_impact_text": format_pattern_minutes_scale(total_impact_minutes),
         "fastest_pattern": fastest_pattern,
         "improvement_targets": improvement_targets[:3],
+        "improvement_candidate_count": int(pattern_summary.get("improvement_candidate_count") or 0),
     }
 
 def build_pattern_dashboard_summary(pattern_summary, pattern_conclusion):
@@ -423,4 +485,6 @@ def build_pattern_dashboard_summary(pattern_summary, pattern_conclusion):
         "problem_points": problem_points[:3],
         "top10_coverage_pct": pattern_summary.get("top10_coverage_pct", 0),
         "total_impact_minutes": pattern_conclusion.get("total_impact_minutes", 0),
+        "total_impact_text": pattern_conclusion.get("total_impact_text", ""),
+        "improvement_candidate_count": pattern_conclusion.get("improvement_candidate_count", 0),
     }

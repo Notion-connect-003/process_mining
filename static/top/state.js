@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Top page module.
  * Depends on: window.ProcessMiningShared and earlier top scripts.
  * Exposes: script-scoped functions used by static/app.js entrypoint.
@@ -352,7 +352,7 @@ function buildGroupedTable(rows, groupColumns = [], options = {}) {
     const allHeaders = [...validGroupCols, ...nonGroupHeaders];
     const headHtml = allHeaders.map((header) => `<th>${escapeHtml(header)}</th>`).join("");
 
-    // rowspan險育ｮ・ 蜷・｡後・蜷・げ繝ｫ繝ｼ繝怜・縺ｫ縺､縺・※縲悟酔縺倅ｸ贋ｽ阪げ繝ｫ繝ｼ繝怜､縺檎ｶ壹￥騾｣邯壽焚縲阪ｒ豎ゅａ繧・
+    // rowspan は先頭のグループ列にだけ付けて、同じ値が続く間だけ縦結合する。
     function calcRowspan(rowIndex, colIndex) {
         const row = rows[rowIndex];
         let span = 1;

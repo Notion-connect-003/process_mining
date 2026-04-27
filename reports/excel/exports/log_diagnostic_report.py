@@ -4,6 +4,7 @@ from openpyxl import Workbook
 
 from reports.excel.common import (
     LOG_DIAGNOSTIC_SHEET_NAMES,
+    append_bullet_rows,
     append_key_value_rows,
     append_table_to_worksheet,
     autosize_worksheet_columns,
@@ -49,6 +50,60 @@ def build_log_diagnostic_missing_count_text(diagnostics):
 def build_log_diagnostic_duplicate_rate_text(diagnostics):
     duplicate_rate = float((diagnostics or {}).get("duplicate_rate") or 0.0)
     return f"{duplicate_rate * 100:.1f}%"
+
+
+def _diagnostic_count(value):
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def build_log_diagnostic_overall_status(diagnostics):
+    diagnostics = diagnostics or {}
+    missing_counts = diagnostics.get("missing_counts") or {}
+    duplicate_rate = float(diagnostics.get("duplicate_rate") or 0.0)
+    duplicate_row_count = _diagnostic_count(diagnostics.get("duplicate_row_count"))
+    record_count = _diagnostic_count(diagnostics.get("record_count"))
+    case_count = _diagnostic_count(diagnostics.get("case_count"))
+    activity_type_count = _diagnostic_count(diagnostics.get("activity_type_count"))
+    missing_total = sum(
+        _diagnostic_count(missing_counts.get(key))
+        for key in ("case_id", "activity", "timestamp")
+    )
+    timestamp_missing = _diagnostic_count(missing_counts.get("timestamp"))
+    has_time_range = bool((diagnostics.get("time_range") or {}).get("min")) and bool(
+        (diagnostics.get("time_range") or {}).get("max")
+    )
+
+    if record_count <= 0 or case_count <= 0 or activity_type_count <= 0:
+        return "要確認"
+    if missing_total > 0 or timestamp_missing > 0 or not has_time_range or duplicate_rate >= 0.05:
+        return "要確認"
+    if duplicate_row_count > 0 or duplicate_rate > 0:
+        return "注意"
+    return "問題なし"
+
+
+def build_log_diagnostic_next_actions(diagnostics):
+    diagnostics = diagnostics or {}
+    missing_counts = diagnostics.get("missing_counts") or {}
+    actions = []
+    if _diagnostic_count(diagnostics.get("record_count")) <= 0:
+        actions.append("ログレコードが読み込めていないため、CSVのヘッダー行と文字コードを確認してください。")
+    if _diagnostic_count(diagnostics.get("case_count")) <= 0:
+        actions.append("ケースID列の選択と空欄を確認してください。")
+    if _diagnostic_count(diagnostics.get("activity_type_count")) <= 0:
+        actions.append("アクティビティ列の選択と空欄を確認してください。")
+    if _diagnostic_count(missing_counts.get("timestamp")) > 0:
+        actions.append("タイムスタンプ列の空欄を確認してください。")
+    if not diagnostics.get("time_range"):
+        actions.append("タイムスタンプ列の日付変換結果を確認してください。")
+    if _diagnostic_count(diagnostics.get("duplicate_row_count")) > 0:
+        actions.append("重複行の内容を確認し、同一イベントの二重登録かどうかを判断してください。")
+    if not actions:
+        actions.append("現時点で致命的な問題は見つかっていません。分析結果の前提として、タイムスタンプ列が実態に合っているか確認してください。")
+    return actions[:5]
 
 
 def build_log_diagnostic_filter_rows(profile_payload, preview_limit=30):
@@ -127,6 +182,7 @@ def build_log_diagnostic_workbook_bytes(profile_payload, raw_df, sample_row_limi
         ("重複あり/なし", diagnostics.get("duplicate_status", "なし")),
         ("重複除外後レコード数", diagnostics.get("deduplicated_record_count", "-")),
         ("重複率", build_log_diagnostic_duplicate_rate_text(diagnostics)),
+        ("総合判定", build_log_diagnostic_overall_status(diagnostics)),
         ("ヘッダー一覧", ", ".join(diagnostics.get("headers") or [])),
         ("ログサンプル出力上限", int(sample_row_limit)),
         ("ログサンプル出力件数", sample_row_count),
@@ -136,6 +192,13 @@ def build_log_diagnostic_workbook_bytes(profile_payload, raw_df, sample_row_limi
         "ログ診断サマリー",
         summary_rows,
         description="トップ画面のログ診断に表示する件数・期間・欠損・重複をまとめています。",
+    )
+    next_row = append_bullet_rows(
+        summary_sheet,
+        "次に確認すること",
+        build_log_diagnostic_next_actions(diagnostics),
+        start_row=next_row,
+        column_count=4,
     )
 
     column_summary_rows = [

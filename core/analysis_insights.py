@@ -107,7 +107,7 @@ def _build_frequency_insights(items, analysis_rows, max_items):
         items,
         max_items,
         "slowest_activity",
-        f"平均処理時間が最も長いアクティビティは「{longest_activity}」で、平均 {longest_avg_duration:.2f} 分です。",
+        f"平均所要時間が最も長いアクティビティは「{longest_activity}」で、平均 {longest_avg_duration:.2f} 分です。",
         ["analysis"],
     )
 
